@@ -122,7 +122,9 @@ func loadConfig() {
 
 	// .env 先于 config.json 读入环境（不覆盖已有环境变量）；
 	// 之后的 os.Getenv 阶段统一生效，优先级：环境变量 > .env
+	// Docker 部署约定数据卷挂载在 /data，也查找 /data/.env
 	loadEnvFile(".")
+	loadEnvFile("/data")
 	loadEnvFile(filepath.Dir(os.Args[0]))
 
 	// config.json：只承载非敏感项（addr/db/html/debug）

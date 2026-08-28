@@ -1,0 +1,10 @@
+.git
+.github
+server/sandbox-server
+server/sandbox.db*
+server/sandbox.log
+server/.env
+*.db-shm
+*.db-wal
+.DS_Store
+README.md

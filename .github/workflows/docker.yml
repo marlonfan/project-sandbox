@@ -1,0 +1,71 @@
+name: Build Docker Image
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=sha
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 首次推送后镜像默认私有；尝试通过 API 设为公开。
+      # 若接口不可用（GitHub 未开放该端点），需在包设置页手动改一次公开。
+      - name: Set package visibility to public
+        continue-on-error: true
+        run: |
+          code=$(curl -sS -o /tmp/vis.json -w '%{http_code}' -X PATCH \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/user/packages/container/${{ github.event.repository.name }}" \
+            -d '{"visibility":"public"}' || echo "curl-failed")
+          echo "PATCH visibility => HTTP $code"
+          cat /tmp/vis.json 2>/dev/null || true
+          if [ "$code" != "204" ]; then
+            echo "::notice::需手动公开镜像: https://github.com/users/${{ github.repository_owner }}/packages/container/${{ github.event.repository.name }}/settings"
+          fi
