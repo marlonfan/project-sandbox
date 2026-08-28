@@ -1,0 +1,6 @@
+{
+  "addr": ":8787",
+  "db": "sandbox.db",
+  "html": "project-sandbox.html",
+  "debug": false
+}

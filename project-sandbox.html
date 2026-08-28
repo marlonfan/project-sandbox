@@ -1,0 +1,2023 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>项目沙盘</title>
+<style>
+  :root{
+    --bg:#faf9f5; --panel:#ffffff; --card:#ffffff; --card-hover:#f5f3ec;
+    --border:#e8e6dc; --border-soft:#dfddd2;
+    --text:#1f1e1d; --muted:#6e6b64; --faint:#a29e94;
+    --green:#15803d; --amber:#b45309; --red:#dc2626; --gray:#6b7280; --blue:#2563eb;
+    --accent:#d97757; --accent-hover:#c65f44;
+    --radius:12px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    font-size:14px; line-height:1.5;
+  }
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  input,select,textarea{font-family:inherit;font-size:14px;color:var(--text);background:#ffffff;border:1px solid var(--border);border-radius:8px;padding:8px 10px;width:100%;outline:none;transition:border-color .15s,box-shadow .15s}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(217,119,87,.12)}
+  ::placeholder{color:var(--faint)}
+  svg{flex-shrink:0}
+
+  /* ---------- Header ---------- */
+  header{
+    position:sticky;top:0;z-index:20;
+    background:rgba(250,249,245,.92);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--border);
+    padding:14px 22px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  }
+  .logo{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700;letter-spacing:.5px;white-space:nowrap;font-family:Georgia,'Times New Roman','Songti SC',SimSun,serif}
+  .logo svg{color:var(--accent)}
+  .stats{display:flex;gap:6px;flex-wrap:wrap}
+  .stat{
+    display:flex;align-items:center;gap:7px;background:var(--panel);
+    border:1px solid var(--border);border-radius:99px;padding:4px 12px;font-size:12.5px;color:var(--muted);white-space:nowrap;
+  }
+  .stat b{color:var(--text);font-variant-numeric:tabular-nums;font-size:14px}
+  .stat.warn b{color:var(--amber)} .stat.bad b{color:var(--red)}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+  /* 顶栏两行布局：第一行 logo + 统计 + 用户区，第二行工具栏独占一行 */
+  #user-ctl{margin-left:auto}
+  .toolbar{flex-basis:100%;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  /* ---------- 沙盘切换（自定义下拉） ---------- */
+  .board-btn{
+    display:inline-flex;align-items:center;gap:8px;max-width:260px;
+    background:var(--card);border:1px solid var(--border);border-radius:9px;
+    padding:7px 11px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;
+    transition:background .15s,border-color .15s;
+  }
+  .board-btn:hover{background:var(--card-hover)}
+  .board-btn svg{flex-shrink:0}
+  .board-btn .bb-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .board-btn .bb-chev{color:var(--faint);transition:transform .18s;margin-left:auto}
+  #board-ctl.open .board-btn{border-color:var(--accent)}
+  #board-ctl.open .board-btn .bb-chev{transform:rotate(180deg)}
+  .board-menu{
+    display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:70;
+    background:var(--card);border:1px solid var(--border);border-radius:10px;
+    box-shadow:0 10px 28px rgba(31,30,29,.14);min-width:250px;max-width:320px;
+    padding:4px;max-height:340px;overflow-y:auto;
+  }
+  .board-menu.open{display:block}
+  .board-item{display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:7px;cursor:pointer}
+  .board-item:hover{background:rgba(31,30,29,.05)}
+  .board-item .bi-check{visibility:hidden;color:var(--accent);flex-shrink:0}
+  .board-item.active .bi-check{visibility:visible}
+  .board-item-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+  .board-item-name{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .board-item.active .board-item-name{color:var(--accent)}
+  .board-item-time{font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+  .board-item-acts{display:none;gap:2px;flex-shrink:0}
+  .board-item:hover .board-item-acts,.board-item.active .board-item-acts{display:inline-flex}
+  .board-menu-foot{border-top:1px solid var(--border);margin-top:4px;padding-top:4px}
+  .board-new{
+    display:block;width:100%;text-align:left;padding:7px 8px;border:none;background:none;
+    border-radius:7px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;
+  }
+  .board-new:hover{background:rgba(31,30,29,.05);color:var(--text)}
+  .search-wrap{position:relative;flex:1;min-width:150px;max-width:420px;margin-left:auto}
+  .search-wrap svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--faint)}
+  .search-wrap input{padding-left:30px;width:100%}
+  select#status-filter{width:auto;padding-right:26px}
+  .btn{
+    display:inline-flex;align-items:center;gap:6px;border-radius:8px;padding:7px 13px;
+    font-size:13px;font-weight:500;border:1px solid var(--border);background:var(--panel);
+    transition:background .15s,border-color .15s;white-space:nowrap;
+  }
+  .btn:hover{background:var(--card-hover);border-color:var(--border-soft)}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn-primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+  .btn-danger{background:var(--red);border-color:var(--red);color:#fff}
+  .btn-danger:hover{background:#dc3535}
+  .btn-ghost{border-color:transparent;color:var(--muted)}
+  .btn-ghost:hover{color:var(--text);background:var(--card)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.iconic{padding:7px 9px}
+  .icon-btn{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;color:var(--faint);transition:.15s}
+  .icon-btn:hover{color:var(--text);background:rgba(31,30,29,.06)}
+
+  /* ---------- Board ---------- */
+  main{
+    padding:22px;padding-bottom:96px;min-height:calc(100vh - 70px);
+    background-image:
+      linear-gradient(rgba(31,30,29,.038) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(31,30,29,.038) 1px,transparent 1px);
+    background-size:28px 28px;
+  }
+  #board{display:flex;flex-direction:column;gap:16px;max-width:1160px;margin:0 auto}
+  .zone{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius);box-shadow:0 1px 2px rgba(31,30,29,.04);
+    display:flex;flex-direction:column;min-height:120px;
+  }
+  .zone-head{padding:14px 16px 11px;display:flex;align-items:flex-start;gap:9px}
+  .zone-dot{width:8px;height:8px;border-radius:50%;margin-top:7px}
+  .zc-btn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;color:var(--faint);margin-top:3px}
+  .zc-btn:hover{color:var(--text);background:rgba(31,30,29,.06)}
+  .zc-chev{transition:transform .2s}
+  .zone.collapsed .zc-chev{transform:rotate(-90deg)}
+  .zone.collapsed .zone-body{display:none}
+  .zone.collapsed{min-height:0}
+  .zone-title-wrap{flex:1;min-width:0}
+  .zone-name{font-weight:700;font-size:15.5px;word-break:break-all}
+  .zone-desc{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.6}
+  .zone-meta{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:11.5px;color:var(--muted)}
+  .zone-count{background:rgba(31,30,29,.07);border-radius:99px;padding:1px 8px;font-variant-numeric:tabular-nums}
+  .zone-avgbar{flex:1;height:4px;background:rgba(31,30,29,.1);border-radius:99px;overflow:hidden;max-width:110px}
+  .zone-avgbar i{display:block;height:100%;background:#57534e;border-radius:99px;transition:width .4s ease}
+  .zone-body{padding:4px 12px 12px;display:flex;flex-direction:column;gap:9px;flex:1;border-radius:0 0 var(--radius) var(--radius);transition:background .15s,box-shadow .15s}
+  .zone-body.drag-over{background:rgba(217,119,87,.07);box-shadow:inset 0 0 0 2px rgba(217,119,87,.5)}
+
+  /* ---------- Project row ---------- */
+  .prow{
+    display:flex;align-items:center;gap:10px;
+    background:var(--card);border:1px solid var(--border);
+    border-radius:9px;padding:8px 12px;cursor:pointer;user-select:none;
+    transition:background .15s,opacity .25s;
+  }
+  .prow:hover{background:var(--card-hover)}
+  .prow-name{font-weight:600;font-size:13.5px;min-width:0;word-break:break-all}
+  .prow .pbar{margin-left:auto}
+  .st{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);white-space:nowrap;flex-shrink:0;cursor:pointer;padding:2px 5px;border-radius:6px}
+  .st:hover{background:rgba(31,30,29,.06)}
+  .st-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+  .pbar{width:90px;flex-shrink:0;height:5px;background:rgba(31,30,29,.08);border-radius:99px;overflow:hidden}
+  .pbar i{display:block;height:100%;border-radius:99px;background:#57534e;transition:width .4s ease}
+  .ppct{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:34px;text-align:right;flex-shrink:0}
+  .chip{display:inline-flex;align-items:center;gap:5px;background:none;padding:0;white-space:nowrap;flex-shrink:0;font-size:11.5px;color:var(--muted)}
+  .avatar{width:16px;height:16px;border-radius:50%;background:#e8e6dc;color:var(--muted);font-size:9.5px;display:inline-flex;align-items:center;justify-content:center;font-weight:700}
+  .chip.overdue{color:#b91c1c;font-weight:500}
+  .issue-badge{display:inline-flex;align-items:center;gap:4px;font-weight:500;flex-shrink:0;font-size:11.5px;color:var(--muted)}
+  .issue-badge.done-all{color:var(--green)}
+  .chev{color:var(--faint);transition:transform .2s;flex-shrink:0}
+  .prow.open .chev{transform:rotate(90deg)}
+  .pdesc{
+    font-size:11.5px;color:var(--muted);margin:4px 0 4px 12px;padding:0 0 0 14px;
+    border-left:1px solid var(--border);word-break:break-all;line-height:1.6;
+  }
+  .pblock{display:flex;flex-direction:column}
+  .psub{
+    margin:-3px 0 4px 12px;padding:3px 0 3px 14px;border-left:1px solid var(--border);
+    display:flex;flex-direction:column;gap:1px;
+  }
+  .psub-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);padding:2px 4px;border-radius:6px;min-width:0}
+  .psub-item:hover{background:rgba(31,30,29,.04)}
+  .psub-item input{width:13px;height:13px;accent-color:var(--green);cursor:pointer;margin:0;flex-shrink:0}
+  .psub-main{display:flex;align-items:center;gap:7px;min-width:0;flex:1;cursor:pointer}
+  .ptitle{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pdot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+  .pdot.sev-high{background:#dc2626}
+  .pdot.sev-medium{background:#d97706}
+  .pdot.sev-low{background:#a8a29e}
+  .psub-more{font-size:11px;color:var(--faint);padding:2px 4px;cursor:pointer}
+  .psub-more:hover{color:var(--muted)}
+  .psub-item.done{opacity:.55}
+  .psub-item.done .ptitle{text-decoration:line-through}
+  .psub-del{opacity:0;transition:opacity .15s}
+  .psub-add{display:flex;gap:6px;margin-top:5px}
+  .psub-add input{flex:1;font-size:12px;padding:4px 9px}
+  .psub-add select{width:64px;font-size:12px;padding:4px}
+  .psub-edit{
+    flex:1;min-width:0;font-size:13.5px;padding:7px 11px;
+    background:#ffffff;border:1px solid var(--accent);border-radius:8px;
+    box-shadow:0 0 0 3px rgba(217,119,87,.12);
+  }
+  .ptitle-wrap{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .pnote{font-size:10.5px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .psub-note{opacity:0;transition:opacity .15s}
+  .psub-note.on{opacity:1;color:var(--accent)}
+  .psub-item:hover .psub-note,.psub-item:hover .psub-del,.issue-item:hover .icon-btn{opacity:1}
+  .issue-item{flex-wrap:wrap}
+  .issue-note-line{flex-basis:100%;padding-left:26px}
+  .psub-notes{
+    margin:2px 0 4px 22px;padding:7px 9px;
+    background:rgba(31,30,29,.03);border-radius:8px;
+    display:flex;flex-direction:column;gap:3px;
+  }
+  .pnote-row{display:flex;align-items:center;gap:8px;font-size:12px;padding:2px 4px;border-radius:6px}
+  .pnote-row:hover{background:rgba(31,30,29,.04)}
+  .pnote-txt{flex:1;min-width:0;color:var(--muted);cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pnote-ts{font-size:10.5px;color:var(--faint);flex-shrink:0}
+  .pnote-row .icon-btn{opacity:0}
+  .pnote-row:hover .icon-btn{opacity:1}
+  .pnote-empty{font-size:11.5px;color:var(--faint);padding:2px 4px}
+  .psub-note-add{display:flex;margin-top:3px}
+  .psub-note-add input{width:100%;font-size:12px;padding:4px 9px}
+  .issue-title{cursor:pointer}
+  .pexp{
+    margin:-3px 0 4px 12px;padding:14px 16px;background:var(--panel);
+    border:1px solid var(--border);border-radius:10px;
+  }
+  .zone-empty{
+    border:1.5px dashed var(--border-soft);border-radius:10px;padding:18px;text-align:center;
+    color:var(--faint);font-size:12.5px;cursor:pointer;transition:.15s;
+  }
+  .zone-empty:hover{color:var(--muted);border-color:var(--faint)}
+
+  /* ---------- Empty state ---------- */
+  .empty-state{text-align:center;padding:90px 20px;color:var(--muted)}
+  .empty-state h2{font-size:19px;color:var(--text);margin-bottom:8px}
+  .empty-state p{margin-bottom:22px;font-size:13.5px}
+
+  /* ---------- Modal / Drawer ---------- */
+  .modal{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:20px}
+  /* 确认框会叠在历史/动态弹窗之上，需高于普通弹窗层级 */
+  #confirm-modal{z-index:60}
+  .modal.open{display:flex}
+  .backdrop{position:absolute;inset:0;background:rgba(31,30,29,.35);backdrop-filter:blur(2px)}
+  /* ---------- 登录 / 注册 ---------- */
+  .auth-tabs{display:flex;gap:4px;background:rgba(31,30,29,.05);padding:3px;border-radius:9px;margin-bottom:14px}
+  .auth-tab{flex:1;padding:6px 0;border:none;background:none;border-radius:7px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer}
+  .auth-tab.active{background:var(--card);color:var(--text);box-shadow:0 1px 2px rgba(31,30,29,.08)}
+  .a-err{color:#b91c1c;font-size:12px;min-height:16px;margin:2px 0 8px}
+  .a-hint{font-size:11.5px;color:var(--faint);margin-top:4px}
+  .user-email{font-size:12.5px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .panel{
+    position:relative;background:var(--panel);border:1px solid var(--border-soft);border-radius:14px;
+    width:min(460px,100%);max-height:88vh;overflow-y:auto;padding:20px 22px;
+    animation:pop .18s ease;
+  }
+  @keyframes pop{from{transform:scale(.96) translateY(8px);opacity:0}to{transform:none;opacity:1}}
+  .panel h3{font-size:16px;margin-bottom:16px;display:flex;align-items:center;font-family:Georgia,'Times New Roman','Songti SC',SimSun,serif}
+  .panel h3 .icon-btn{margin-left:auto}
+  .field{margin-bottom:13px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+  .field-row{display:flex;gap:10px}
+  .field-row .field{flex:1}
+  textarea{resize:vertical;min-height:64px}
+  .swatches{display:flex;gap:9px}
+  .swatch{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:.15s;position:relative}
+  .swatch.sel{border-color:#1f1e1d;transform:scale(1.12);box-shadow:0 0 0 2px #fff inset}
+  .form-foot{display:flex;justify-content:flex-end;gap:9px;margin-top:18px}
+
+  .sec-title{font-size:12px;color:var(--muted);letter-spacing:1px;margin:20px 0 10px;display:flex;align-items:center;gap:8px}
+  .sec-title::after{content:"";flex:1;height:1px;background:var(--border)}
+  .issue-item{display:flex;align-items:flex-start;gap:9px;background:var(--card);border:1px solid var(--border);border-radius:9px;padding:9px 11px;margin-bottom:8px}
+  .issue-item.resolved{opacity:.5}
+  .issue-item.resolved .issue-title{text-decoration:line-through}
+  .issue-check{margin-top:3px;width:15px;height:15px;accent-color:var(--green);cursor:pointer;flex-shrink:0}
+  .sev-tag{font-size:10.5px;font-weight:600;flex-shrink:0;margin-top:2px;min-width:18px;text-align:center}
+  .sev-high{color:#b91c1c}
+  .sev-medium{color:#92400e}
+  .sev-low{color:#6b7280}
+  .issue-title{flex:1;font-size:13px;word-break:break-all}
+  .issue-add{display:flex;gap:8px;margin-top:10px}
+  .issue-add input{flex:1}
+  .issue-add select{width:86px}
+  .meta-line{font-size:11.5px;color:var(--faint);margin-top:16px}
+
+  /* confirm */
+  #confirm-modal .panel{width:min(400px,100%)}
+  #confirm-msg{color:var(--muted);font-size:13.5px;margin-bottom:6px;line-height:1.7}
+  #confirm-input-wrap{display:none;margin-top:12px}
+
+  /* history */
+  .hist-hint{font-size:12px;color:var(--muted);margin:-6px 0 14px;line-height:1.7}
+  .hist-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:9px;margin-bottom:8px;background:var(--card)}
+  .hist-info{flex:1;min-width:0}
+  .hist-time{font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px}
+  .hist-sum{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .hist-cur{font-size:10.5px;color:var(--green);background:rgba(21,128,61,.09);padding:1px 8px;border-radius:99px;font-weight:600}
+  .hist-empty{color:var(--faint);font-size:12.5px;text-align:center;padding:18px 0}
+  .snap-row{display:flex;align-items:center;gap:14px;padding:10px 12px;border:1px solid var(--border);border-radius:9px;margin-bottom:8px;background:var(--card)}
+  .snap-info{flex:1;min-width:0}
+  .snap-name{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .snap-goal{font-size:11px;color:var(--faint);margin-top:1px}
+  .snap-na{color:var(--faint);font-size:12px}
+  .done-txt{text-decoration:line-through;color:var(--muted)}
+  .snap-item{border:1px solid var(--border);border-radius:10px;margin-bottom:10px;background:var(--card);overflow:hidden}
+  .snap-head{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);background:rgba(31,30,29,.02)}
+  .snap-line{display:flex;align-items:center;gap:9px;padding:6px 12px;font-size:12.5px}
+  .snap-line:hover{background:rgba(31,30,29,.03)}
+  .snap-tick{width:6px;height:6px;border-radius:50%;background:var(--faint);flex-shrink:0}
+  .snap-line.latest .snap-tick{background:var(--accent)}
+  .snap-txt{flex:1;min-width:0;color:var(--muted);cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .snap-line.latest .snap-txt{color:var(--text);font-weight:600}
+  .snap-when{font-size:10.5px;color:var(--faint);flex-shrink:0}
+  .snap-pending{margin-top:14px;padding-top:10px;border-top:1px dashed var(--border)}
+  .snap-pending-title{font-size:11.5px;color:var(--faint);margin-bottom:6px}
+  .snap-pending .chip{display:inline-flex;margin:0 4px 4px 0}
+  .bdot{width:7px;height:7px;border-radius:50%;display:inline-block;vertical-align:middle}
+
+  /* quick-edit */
+  .saved-at{font-size:11px;color:var(--green);white-space:nowrap;align-self:center;margin-right:2px}
+
+  /* toast */
+  #toast-wrap{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:100;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+  .toast{
+    background:#ffffff;border:1px solid var(--border-soft);border-radius:9px;padding:9px 16px;font-size:13px;
+    box-shadow:0 8px 28px rgba(31,30,29,.14);animation:toast-in .22s ease;
+  }
+  .toast.ok{border-left:3px solid var(--green)} .toast.err{border-left:3px solid var(--red)}
+  .toast.out{opacity:0;transform:translateY(8px);transition:.3s}
+  @keyframes toast-in{from{opacity:0;transform:translateY(10px)}to{opacity:1}}
+
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-thumb{background:#d9d6cb;border-radius:99px}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  @media (max-width:900px){
+    header{padding:12px 14px;gap:10px}
+    .stats{order:3;width:100%}
+    .toolbar{margin-left:0}
+    .search-wrap{max-width:none;order:8;flex-basis:100%}
+    main{padding:14px}
+    .prow{flex-wrap:wrap}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo" id="logo"></div>
+  <div class="stats" id="stats"></div>
+  <div id="user-ctl" style="display:none;align-items:center;gap:4px"></div>
+  <div class="toolbar">
+    <div id="board-ctl" style="display:none;position:relative">
+      <button type="button" class="board-btn" id="board-btn" title="切换沙盘"></button>
+      <div class="board-menu" id="board-menu">
+        <div class="board-menu-list" id="board-menu-list"></div>
+        <div class="board-menu-foot">
+          <button type="button" class="board-new" data-action="new-board">＋ 新建沙盘</button>
+        </div>
+      </div>
+    </div>
+    <div class="search-wrap" id="search-wrap">
+      <input id="search" type="search" placeholder="搜索项目 / 负责人">
+    </div>
+    <select id="status-filter">
+      <option value="all">全部状态</option>
+      <option value="on-track">进行中</option>
+      <option value="at-risk">有风险</option>
+      <option value="blocked">受阻</option>
+      <option value="paused">已暂停</option>
+      <option value="done">已完成</option>
+    </select>
+    <button class="btn btn-primary" data-action="add-goal" id="btn-add-goal"></button>
+    <button class="btn iconic" data-action="show-snap-compare" id="btn-snap" title="事项动态：按事项查看全部进展时间线"></button>
+    <button class="btn iconic" data-action="open-history" id="btn-history" title="历史版本，可一键回滚"></button>
+    <button class="btn iconic" data-action="export" id="btn-export" title="导出 JSON 备份"></button>
+    <button class="btn iconic" data-action="import" id="btn-import" title="从 JSON 恢复"></button>
+    <button class="btn iconic" data-action="toggle-backup" id="btn-backup"></button>
+  </div>
+</header>
+
+<main><div id="board"></div></main>
+
+<!-- 目标弹窗 -->
+<div class="modal" id="goal-modal">
+  <div class="backdrop" data-close="goal-modal"></div>
+  <div class="panel">
+    <h3 id="goal-modal-title"><span>新建目标</span><button class="icon-btn" data-close="goal-modal" id="goal-x"></button></h3>
+    <form id="goal-form">
+      <div class="field"><label>目标名称 *</label><input id="goal-name" required maxlength="40" placeholder="例如：提升用户增长"></div>
+      <div class="field"><label>描述</label><textarea id="goal-desc" maxlength="200" placeholder="这个目标要达成什么？"></textarea></div>
+      <div class="field"><label>颜色标识</label><div class="swatches" id="goal-swatches"></div></div>
+      <div class="form-foot">
+        <button type="button" class="btn btn-ghost" data-close="goal-modal">取消</button>
+        <button type="submit" class="btn btn-primary" id="goal-save">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 项目弹窗 -->
+<div class="modal" id="project-modal">
+  <div class="backdrop" data-close="project-modal"></div>
+  <div class="panel">
+    <h3 id="project-modal-title"><span>新建项目</span><button class="icon-btn" data-close="project-modal" id="project-x"></button></h3>
+    <form id="project-form">
+      <div class="field"><label>项目名称 *</label><input id="project-name" required maxlength="60" placeholder="例如：新用户引导流程改版"></div>
+      <div class="field-row">
+        <div class="field"><label>所属目标 *</label><select id="project-goal" required></select></div>
+        <div class="field"><label>负责人</label><input id="project-owner" maxlength="20" placeholder="谁在推进"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>状态</label><select id="project-status"></select></div>
+        <div class="field"><label>截止日期</label><input id="project-deadline" type="date"></div>
+      </div>
+      <div class="field"><label>备注</label><textarea id="project-desc" maxlength="300" placeholder="补充说明（可选）"></textarea></div>
+      <div class="form-foot">
+        <button type="button" class="btn btn-ghost" data-close="project-modal">取消</button>
+        <button type="submit" class="btn btn-primary" id="project-save">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 输入弹窗（沙盘命名等） -->
+<div class="modal" id="input-modal">
+  <div class="backdrop" data-input-cancel></div>
+  <div class="panel">
+    <h3 id="input-title">输入</h3>
+    <div class="field"><label id="input-label">名称</label><input id="input-field" autocomplete="off" maxlength="30"></div>
+    <div class="form-foot">
+      <button type="button" class="btn btn-ghost" data-input-cancel>取消</button>
+      <button type="button" class="btn btn-primary" id="input-ok">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 确认弹窗 -->
+<div class="modal" id="confirm-modal">
+  <div class="backdrop" data-confirm-cancel></div>
+  <div class="panel">
+    <h3 id="confirm-title">确认操作</h3>
+    <p id="confirm-msg"></p>
+    <div id="confirm-input-wrap" class="field">
+      <label>请输入确认文本</label>
+      <input id="confirm-input" autocomplete="off">
+    </div>
+    <div class="form-foot">
+      <button type="button" class="btn btn-ghost" data-confirm-cancel>取消</button>
+      <button type="button" class="btn btn-primary" id="confirm-ok">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 事项动态弹窗 -->
+<div class="modal" id="snap-modal">
+  <div class="backdrop" data-close="snap-modal"></div>
+  <div class="panel" style="width:min(680px,100%)">
+    <h3><span>事项动态</span><button class="icon-btn" data-close="snap-modal" id="snap-x"></button></h3>
+    <p class="hist-hint">按事项分组展示全部进展时间线（旧 → 新，最新一条高亮），方便对比每件事的推进过程。点击文字可编辑。</p>
+    <div id="snap-list"></div>
+  </div>
+</div>
+
+<!-- 历史版本弹窗 -->
+<div class="modal" id="history-modal">
+  <div class="backdrop" data-close="history-modal"></div>
+  <div class="panel">
+    <h3><span>历史版本</span><button class="icon-btn" data-close="history-modal" id="history-x"></button></h3>
+    <p class="hist-hint">每次保存自动留档，最多保留 20 个版本。恢复前当前状态也会先自动存档，可随时再切回来。</p>
+    <div id="history-list"></div>
+  </div>
+</div>
+
+<!-- 登录 / 注册弹窗 -->
+<div class="modal" id="auth-modal">
+  <div class="backdrop" data-close="auth-modal"></div>
+  <div class="panel" style="width:min(380px,100%)">
+    <h3><span id="auth-title">登录项目沙盘</span><button class="icon-btn" data-close="auth-modal" id="auth-x"></button></h3>
+    <div class="auth-tabs">
+      <button type="button" class="auth-tab active" data-auth-tab="login">登录</button>
+      <button type="button" class="auth-tab" data-auth-tab="register">注册</button>
+    </div>
+    <div class="field"><label>邮箱</label><input id="a-email" type="email" autocomplete="email" placeholder="you@example.com"></div>
+    <div class="field"><label>密码</label><input id="a-pass" type="password" autocomplete="current-password" placeholder="至少 8 位"></div>
+    <div class="field" id="a-code-row" style="display:none">
+      <label>邮箱验证码</label>
+      <div style="display:flex;gap:6px">
+        <input id="a-code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6 位数字" style="flex:1">
+        <button type="button" class="btn" id="a-send" style="flex-shrink:0;white-space:nowrap">发送验证码</button>
+      </div>
+      <div class="a-hint" id="a-hint">验证码将发送到邮箱，15 分钟内有效</div>
+    </div>
+    <div class="a-err" id="a-err"></div>
+    <div class="form-foot">
+      <button type="button" class="btn btn-ghost" data-close="auth-modal">取消</button>
+      <button type="button" class="btn btn-primary" id="a-submit">登录</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-wrap"></div>
+<input type="file" id="import-file" accept=".json,application/json" hidden>
+
+<script>
+'use strict';
+/* ================= 常量与状态 ================= */
+const STORAGE_KEY = 'project-sandbox-v1';
+const HISTORY_KEY = 'project-sandbox-history-v1';
+const HISTORY_MAX = 20;
+const CURRENT_BOARD_KEY = 'psb-current-board';
+const DAY = 86400000;
+
+/* 服务端模式：?api=http://host:port 可指向任意沙盘服务端；同源部署时自动检测 */
+const API_BASE = (new URLSearchParams(location.search).get('api') || '').replace(/\/+$/, '');
+let serverMode = false;
+let currentBoardId = null;
+let boardsList = [];
+let currentUser = null;
+let authMode = 'login';
+let authCooldown = 0, authCooldownTimer = null;
+
+const STATUS = {
+  'on-track': { label:'进行中', color:'var(--green)' },
+  'at-risk' : { label:'有风险', color:'var(--amber)' },
+  'blocked' : { label:'受阻',   color:'var(--red)' },
+  'paused'  : { label:'已暂停', color:'var(--gray)' },
+  'done'    : { label:'已完成', color:'var(--blue)' },
+};
+const STATUS_CYCLE = ['on-track','at-risk','blocked','paused','done'];
+const PALETTE = ['#2563eb','#7c3aed','#db2777','#ea580c','#0d9488','#ca8a04'];
+const SEVERITY = { high:'高', medium:'中', low:'低' };
+
+let state = null;
+let searchQ = '';
+let statusFilter = 'all';
+let expandedProjectId = null;
+let openNotesIssueId = null;
+let collapsedGoals = new Set();
+function collapsedKey(){
+  return serverMode && currentBoardId ? 'psb-collapsed:' + currentBoardId : 'psb-collapsed';
+}
+function loadCollapsed(){
+  try { collapsedGoals = new Set(JSON.parse(localStorage.getItem(collapsedKey()) || '[]')); }
+  catch(e){ collapsedGoals = new Set(); }
+}
+function saveCollapsed(){
+  try { localStorage.setItem(collapsedKey(), JSON.stringify([...collapsedGoals])); } catch(e){}
+}
+let editingGoalId = null;
+let editingProjectId = null;
+let selectedColor = PALETTE[0];
+
+/* ================= 工具函数 ================= */
+const $ = s => document.querySelector(s);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const todayStr = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+const relDay = n => new Date(Date.now() + n * DAY).toISOString().slice(0, 10);
+
+function fmtTs(ts){
+  if (!ts) return '';
+  const d = new Date(ts), now = new Date();
+  const base = (d.getMonth()+1) + '月' + d.getDate() + '日';
+  return d.getFullYear() !== now.getFullYear() ? d.getFullYear() + '年' + base : base;
+}
+function fmtDeadline(s){
+  if (!s) return '';
+  const [y, m, d] = s.split('-').map(Number);
+  const now = new Date();
+  return (y !== now.getFullYear() ? y + '年' : '') + m + '月' + d + '日';
+}
+function isOverdue(p){
+  return !!p.deadline && p.deadline < todayStr() && p.status !== 'done' && p.status !== 'paused';
+}
+function projectIssues(pid){ return state.issues.filter(i => i.projectId === pid); }
+function unresolvedIssues(pid){ return projectIssues(pid).filter(i => !i.resolved); }
+
+const ICONS = {
+  plus:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  pencil:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>',
+  trash:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+  x:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  download:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></svg>',
+  upload:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5M12 3v12"/></svg>',
+  search:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>',
+  list:'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
+  clock:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>',
+  trend:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></svg>',
+  note:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+  save:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>',
+  target:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
+  logout:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>',
+  layers:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
+  check:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+  chevDown:'<svg class="bb-chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
+};
+
+/* ================= 持久化 ================= */
+const api = p => API_BASE + p;
+let saveTimer = null;
+function save(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flushSave, serverMode ? 500 : 150);
+}
+function flushSave(){
+  clearTimeout(saveTimer);
+  if (serverMode){
+    if (!currentBoardId) return;
+    const bid = currentBoardId;
+    const body = JSON.stringify({ state });
+    apiFetch('/api/boards/' + bid + '/state', { method:'PUT', headers:{'Content-Type':'application/json'}, body })
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); scheduleBackupWrite(); })
+      .catch(e => { if (e && e.message !== 'unauthorized') toast('保存到服务端失败，请检查服务是否在运行', 'err'); });
+    return;
+  }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    pushHistory();
+    scheduleBackupWrite();
+  }
+  catch(e){ toast('保存失败：本地存储不可用', 'err'); }
+}
+
+function loadHistory(){
+  try { const h = JSON.parse(localStorage.getItem(HISTORY_KEY)); return Array.isArray(h) ? h : []; }
+  catch(e){ return []; }
+}
+async function fetchHistory(){
+  if (serverMode && currentBoardId){
+    try {
+      const r = await apiFetch('/api/boards/' + currentBoardId + '/history');
+      if (r.ok){
+        const h = await r.json();
+        // 服务端返回的 data 是已解析对象，归一化成与本地一致的 JSON 字符串
+        if (Array.isArray(h)) return h.map(x => ({ ts: x.ts, data: typeof x.data === 'string' ? x.data : JSON.stringify(x.data) }));
+      }
+    } catch(e){}
+    return [];
+  }
+  return loadHistory();
+}
+function pushHistory(){
+  const h = loadHistory();
+  const snap = JSON.stringify(state);
+  if (h.length && h[h.length - 1].data === snap) return;
+  h.push({ ts: Date.now(), data: snap });
+  while (h.length > HISTORY_MAX) h.shift();
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(h)); } catch(e){}
+}
+function seedData(){
+  const g1=uid(), g2=uid(), g3=uid();
+  const now = Date.now();
+  const P = (name, goalId, owner, progress, status, dl, desc) =>
+    ({ id:uid(), goalId, name, owner, progress, status, deadline:dl, description:desc||'', createdAt:now, updatedAt:now });
+  const p1=P('新用户引导流程改版', g1,'张伟',65,'on-track',relDay(14),'缩短注册到激活的路径，目标次日留存 +8%');
+  const p2=P('老用户召回活动',     g1,'李娜',40,'at-risk', relDay(7), '针对 90 天沉默用户的定向召回');
+  const p3=P('SEO 内容矩阵建设',   g1,'王强',30,'on-track',relDay(30),'每周产出 5 篇行业长尾词内容');
+  const p4=P('会员订阅体系上线',   g2,'陈晨',55,'blocked', relDay(10),'含定价、支付、权益中心三部分');
+  const p5=P('广告位收益优化',     g2,'刘洋',80,'on-track',relDay(5), '按 eCPM 动态调整广告位排序');
+  const p6=P('微服务拆分改造',     g3,'赵磊',45,'on-track',relDay(45),'优先拆分订单与用户域');
+  const p7=P('核心链路性能优化',   g3,'孙悦',100,'done',   relDay(-3),'下单链路 P99 从 800ms 降至 210ms');
+  const p8=P('监控告警体系完善',   g3,'周琪',20,'paused',  relDay(20),'全链路 Trace 接入与告警分级');
+  const projects = [p1,p2,p3,p4,p5,p6,p7,p8];
+  projects.forEach((x,i) => { x.order = i; });
+  return {
+    version: 1,
+    goals: [
+      { id:g1, name:'提升用户增长', description:'拉新、促活与召回，扩大用户规模', color:'#3b82f6', createdAt:now },
+      { id:g2, name:'商业化变现',   description:'构建可持续的收入体系',           color:'#f97316', createdAt:now },
+      { id:g3, name:'技术架构升级', description:'提升稳定性与研发效率',           color:'#8b5cf6', createdAt:now },
+    ],
+    projects,
+    issues: [
+      { id:uid(), projectId:p4.id, title:'支付通道资质审核被卡住，阻塞联调', severity:'high',   resolved:false, createdAt:now },
+      { id:uid(), projectId:p4.id, title:'会员定价方案待法务复核',           severity:'medium', resolved:true,  createdAt:now },
+      { id:uid(), projectId:p2.id, title:'活动预算审批未通过，物料无法开工', severity:'high',   resolved:false, createdAt:now },
+      { id:uid(), projectId:p2.id, title:'短信通道成本超预期，需比价换供应商',severity:'medium', resolved:false, createdAt:now },
+      { id:uid(), projectId:p1.id, title:'引导页 A/B 实验样本量不足',         severity:'low',    resolved:true,  createdAt:now },
+      { id:uid(), projectId:p6.id, title:'服务间调用延迟抖动，P99 超标',     severity:'medium', resolved:false, createdAt:now },
+      { id:uid(), projectId:p7.id, title:'压测环境数据构造脚本报错',         severity:'low',    resolved:true,  createdAt:now },
+      { id:uid(), projectId:p8.id, title:'告警误报率偏高，规则需调优',       severity:'medium', resolved:true,  createdAt:now },
+    ],
+  };
+}
+let corruptDetected = false;
+const EMPTY_STATE = () => ({ version:1, goals:[], projects:[], issues:[] });
+function loadLocal(){
+  let raw = null;
+  try { raw = localStorage.getItem(STORAGE_KEY); } catch(e){}
+  if (raw){
+    let ok = false;
+    try {
+      const data = JSON.parse(raw);
+      if (data && Array.isArray(data.goals) && Array.isArray(data.projects) && Array.isArray(data.issues)){
+        state = normalize(data);
+        ok = true;
+      }
+    } catch(e){}
+    if (!ok){
+      corruptDetected = true;
+      try { localStorage.setItem(STORAGE_KEY + '-corrupt-backup', raw); } catch(e){}
+    }
+  }
+  if (!state){
+    state = seedData();
+    save();
+  }
+}
+
+/* ---------- 服务端模式 ---------- */
+async function detectServer(){
+  try {
+    const r = await fetch(api('/api/boards'), { credentials:'include' });
+    if (r.status === 401){ boardsList = []; return true; } // 服务端在，但需要登录
+    if (r.ok){
+      const j = await r.json();
+      if (Array.isArray(j)){ boardsList = j; return true; }
+    }
+  } catch(e){}
+  if (API_BASE) toast('无法连接沙盘服务端：' + API_BASE + '，已回退到本地保存', 'err');
+  return false;
+}
+async function createBoardRequest(name, stateObj){
+  try {
+    const body = stateObj ? { name, state: stateObj } : { name };
+    const r = await apiFetch('/api/boards', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (r.ok) return await r.json();
+  } catch(e){
+    if (e && e.message !== 'unauthorized') toast('请求服务端失败', 'err');
+    return null;
+  }
+  toast('请求服务端失败', 'err');
+  return null;
+}
+async function loadBoardsList(){
+  try {
+    const r = await apiFetch('/api/boards');
+    if (r.ok){
+      const j = await r.json();
+      if (Array.isArray(j)) boardsList = j;
+    }
+  } catch(e){}
+}
+async function loadFromServer(){
+  await loadBoardsList();
+  if (!boardsList.length){
+    // 新账号给一张空白沙盘，不带示例数据
+    const b = await createBoardRequest('默认沙盘', EMPTY_STATE());
+    if (!b){ toast('初始化服务端沙盘失败', 'err'); serverMode = false; currentBoardId = null; loadLocal(); renderUserCtl(); return; }
+    boardsList = [b];
+  }
+  let savedId = null;
+  try { savedId = localStorage.getItem(CURRENT_BOARD_KEY); } catch(e){}
+  currentBoardId = boardsList.some(b => b.id === savedId) ? savedId : boardsList[0].id;
+  await fetchBoardState();
+  renderBoardSwitcher();
+}
+async function fetchBoardState(){
+  let data = null;
+  try {
+    const r = await apiFetch('/api/boards/' + currentBoardId + '/state');
+    if (r.ok){ const j = await r.json(); data = j.state; }
+  } catch(e){}
+  state = data ? normalize(data) : EMPTY_STATE();
+  if (!data) save();
+  expandedProjectId = null;
+  openNotesIssueId = null;
+  loadCollapsed();
+}
+async function switchBoard(id){
+  closeBoardMenu();
+  if (!serverMode || !id || id === currentBoardId) return;
+  flushSave();
+  currentBoardId = id;
+  try { localStorage.setItem(CURRENT_BOARD_KEY, id); } catch(e){}
+  searchQ = ''; $('#search').value = '';
+  statusFilter = 'all'; $('#status-filter').value = 'all';
+  await fetchBoardState();
+  renderBoardSwitcher();
+  renderAll();
+  const b = boardsList.find(x => x.id === id);
+  toast('已切换到「' + (b ? b.name : '') + '」');
+}
+async function newBoardFlow(){
+  const name = await inputDialog({ title:'新建沙盘', label:'沙盘名称', value:'新沙盘', okText:'创建' });
+  if (name === null) return;
+  const b = await createBoardRequest(name || '新沙盘', EMPTY_STATE());
+  if (!b) return;
+  boardsList.unshift(b);
+  await switchBoard(b.id);
+}
+async function renameBoardFlow(id){
+  const b = boardsList.find(x => x.id === (id || currentBoardId));
+  if (!b) return;
+  const name = await inputDialog({ title:'重命名沙盘', label:'沙盘名称', value:b.name, okText:'保存' });
+  if (name === null || !name || name === b.name) return;
+  try {
+    const r = await apiFetch('/api/boards/' + currentBoardId, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name }) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    b.name = name;
+    renderBoardSwitcher();
+    toast('沙盘已重命名');
+  } catch(e){ if (e && e.message !== 'unauthorized') toast('重命名失败，请检查服务端', 'err'); }
+}
+async function deleteBoardFlow(id){
+  const targetId = id || currentBoardId;
+  const b = boardsList.find(x => x.id === targetId);
+  if (!b) return;
+  const isCurrent = targetId === currentBoardId;
+  clearTimeout(saveTimer);
+  const detail = isCurrent
+    ? '及其全部 ' + state.goals.length + ' 个目标、' + state.projects.length + ' 个项目、所有事项与历史版本'
+    : '及其全部内容与历史版本';
+  const ok = await confirmDialog({
+    title:'删除沙盘',
+    message:'将删除沙盘「' + b.name + '」' + detail + '，此操作不可恢复。',
+    danger:true,
+    requireText:b.name,
+  });
+  if (!ok) return;
+  try {
+    const r = await apiFetch('/api/boards/' + targetId, { method:'DELETE' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+  } catch(e){ if (e && e.message !== 'unauthorized') toast('删除失败，请检查服务端', 'err'); return; }
+  boardsList = boardsList.filter(x => x.id !== targetId);
+  toast('沙盘「' + b.name + '」已删除');
+  if (!isCurrent){ renderBoardSwitcher(); return; }
+  if (!boardsList.length){
+    const nb = await createBoardRequest('默认沙盘', EMPTY_STATE());
+    if (nb) boardsList = [nb];
+    else { serverMode = false; currentBoardId = null; loadLocal(); renderAll(); return; }
+  }
+  currentBoardId = null;
+  await switchBoard(boardsList[0].id);
+  renderAll();
+}
+/* ---------- 登录 / 注册 ---------- */
+function apiFetch(p, opts){
+  opts = opts || {};
+  opts.credentials = 'include';
+  return fetch(api(p), opts).then(r => {
+    if (r.status === 401){
+      currentUser = null;
+      renderUserCtl();
+      openAuth('login');
+      throw new Error('unauthorized');
+    }
+    return r;
+  });
+}
+function renderUserCtl(){
+  const el = $('#user-ctl');
+  if (!serverMode){ el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  if (currentUser){
+    el.innerHTML = '<span class="user-email" title="已登录：' + esc(currentUser.email) + '">' + esc(currentUser.email) + '</span>' +
+      '<button class="icon-btn" data-action="logout" title="退出登录">' + ICONS.logout + '</button>';
+  } else {
+    el.innerHTML = '<button class="btn btn-primary" data-action="show-auth">登录 / 注册</button>';
+  }
+}
+async function fetchMe(){
+  try {
+    const r = await fetch(api('/api/auth/me'), { credentials:'include' });
+    if (r.ok) return await r.json();
+  } catch(e){}
+  return null;
+}
+function setAuthMode(mode){
+  authMode = mode;
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.toggle('active', t.dataset.authTab === mode));
+  $('#a-code-row').style.display = mode === 'register' ? 'block' : 'none';
+  $('#a-submit').textContent = mode === 'register' ? '注册并登录' : '登录';
+  $('#auth-title').textContent = mode === 'register' ? '注册项目沙盘' : '登录项目沙盘';
+  $('#a-err').textContent = '';
+}
+function openAuth(mode){
+  setAuthMode(mode || 'login');
+  $('#auth-modal').classList.add('open');
+  setTimeout(() => $('#a-email').focus(), 50);
+}
+function showAuthErr(msg){ $('#a-err').textContent = msg || ''; }
+async function sendCode(){
+  if (authCooldown > 0) return;
+  const email = $('#a-email').value.trim();
+  const pass = $('#a-pass').value;
+  if (!email){ showAuthErr('请先填写邮箱'); return; }
+  if (pass.length < 8){ showAuthErr('密码至少 8 位'); return; }
+  const btn = $('#a-send');
+  btn.disabled = true;
+  try {
+    const r = await fetch(api('/api/auth/register'), { method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, password: pass }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok){ showAuthErr(j.error || '发送失败'); btn.disabled = false; return; }
+    showAuthErr('');
+    $('#a-hint').textContent = '验证码已发送到 ' + email + '，15 分钟内有效';
+    toast('验证码已发送，请查收邮箱');
+    authCooldown = 60;
+    btn.textContent = authCooldown + 's';
+    authCooldownTimer = setInterval(() => {
+      authCooldown--;
+      if (authCooldown <= 0){ clearInterval(authCooldownTimer); btn.textContent = '发送验证码'; btn.disabled = false; }
+      else btn.textContent = authCooldown + 's';
+    }, 1000);
+  } catch(e){ showAuthErr('网络错误，发送失败'); btn.disabled = false; }
+}
+async function authSubmit(){
+  const email = $('#a-email').value.trim();
+  const pass = $('#a-pass').value;
+  if (!email){ showAuthErr('请填写邮箱'); return; }
+  if (pass.length < 8){ showAuthErr('密码至少 8 位'); return; }
+  const btn = $('#a-submit');
+  btn.disabled = true;
+  try {
+    let r, j;
+    if (authMode === 'login'){
+      r = await fetch(api('/api/auth/login'), { method:'POST', credentials:'include',
+        headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, password: pass }) });
+      j = await r.json().catch(() => ({}));
+      if (r.status === 403 && j.code === 'unverified'){
+        setAuthMode('register');
+        $('#a-hint').textContent = '该邮箱尚未完成验证，验证码仍有效，可重新发送';
+        showAuthErr('邮箱尚未验证，请获取验证码完成注册');
+        btn.disabled = false;
+        return;
+      }
+    } else {
+      const code = $('#a-code').value.trim();
+      if (!/^\d{6}$/.test(code)){ showAuthErr('请输入 6 位数字验证码'); btn.disabled = false; return; }
+      r = await fetch(api('/api/auth/verify'), { method:'POST', credentials:'include',
+        headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, code }) });
+      j = await r.json().catch(() => ({}));
+    }
+    if (!r.ok){ showAuthErr(j.error || '操作失败'); btn.disabled = false; return; }
+    currentUser = j;
+    $('#auth-modal').classList.remove('open');
+    $('#a-pass').value = ''; $('#a-code').value = ''; $('#a-err').textContent = '';
+    renderUserCtl();
+    await loadFromServer();
+    renderAll();
+    toast('欢迎，' + currentUser.email);
+  } catch(e){ showAuthErr('网络错误，请稍后再试'); }
+  btn.disabled = false;
+}
+async function logoutFlow(){
+  try { await fetch(api('/api/auth/logout'), { method:'POST', credentials:'include' }); } catch(e){}
+  currentUser = null;
+  boardsList = [];
+  currentBoardId = null;
+  expandedProjectId = null;
+  openNotesIssueId = null;
+  state = EMPTY_STATE();
+  renderUserCtl();
+  renderBoardSwitcher();
+  renderAll();
+  openAuth('login');
+  toast('已退出登录');
+}
+
+function normalize(data){  return {
+    version: 1,
+    goals:    data.goals.map(g => ({ id:String(g.id), name:String(g.name||'未命名目标'), description:String(g.description||''), color:String(g.color||PALETTE[0]), createdAt:Number(g.createdAt)||Date.now() })),
+    projects: data.projects.map(p => ({ id:String(p.id), goalId:String(p.goalId), name:String(p.name||'未命名项目'), owner:String(p.owner||''), progress:Math.min(100,Math.max(0,Number(p.progress)||0)), status:STATUS[p.status]?p.status:'on-track', deadline:p.deadline?String(p.deadline):'', description:String(p.description||''), createdAt:Number(p.createdAt)||Date.now(), updatedAt:Number(p.updatedAt)||Date.now(), order:Number(p.order)||0 })),
+    issues:   data.issues.map(i => ({ id:String(i.id), projectId:String(i.projectId), title:String(i.title||''), severity:SEVERITY[i.severity]?i.severity:'medium', resolved:!!i.resolved, createdAt:Number(i.createdAt)||Date.now(), notes:Array.isArray(i.notes) ? i.notes.map(n => ({ ts:Number(n.ts)||0, text:String(n.text||'') })) : [] })),
+  };
+}
+
+/* ================= 渲染 ================= */
+function matchesFilter(p){
+  if (statusFilter !== 'all' && p.status !== statusFilter) return false;
+  if (searchQ){
+    const q = searchQ.toLowerCase();
+    if (!(p.name.toLowerCase().includes(q) || (p.owner||'').toLowerCase().includes(q))) return false;
+  }
+  return true;
+}
+
+function renderStats(){
+  const total = state.projects.length;
+  const active = state.projects.filter(p => p.status === 'on-track').length;
+  const risky  = state.projects.filter(p => p.status === 'at-risk' || p.status === 'blocked').length;
+  const openIssues = state.projects.reduce((s,p) => s + unresolvedIssues(p.id).length, 0);
+  $('#stats').innerHTML =
+    '<span class="stat">总项目 <b>' + total + '</b></span>' +
+    '<span class="stat"><span class="dot" style="background:var(--green)"></span>进行中 <b>' + active + '</b></span>' +
+    '<span class="stat warn"><span class="dot" style="background:var(--amber)"></span>风险中 <b>' + risky + '</b></span>' +
+    '<span class="stat bad"><span class="dot" style="background:var(--red)"></span>未完成事项 <b>' + openIssues + '</b></span>';
+}
+
+function pblockHTML(p){
+  return (
+    '<div class="pblock" data-pid="' + p.id + '">' +
+      prowHTML(p) +
+      (expandedProjectId === p.id ? pexpHTML(p) : '') +
+      (p.description ? '<div class="pdesc">' + esc(p.description) + '</div>' : '') +
+      psubHTML(p) +
+    '</div>'
+  );
+}
+
+function prowHTML(p){
+  const st = STATUS[p.status];
+  const all = projectIssues(p.id);
+  const unres = all.filter(i => !i.resolved);
+  const overdue = isOverdue(p);
+  const doneCnt = all.length - unres.length;
+  const ratePct = all.length ? Math.round(doneCnt / all.length * 100) : 0;
+  const rateTxt = all.length ? doneCnt + '/' + all.length : '—';
+  let foot = '';
+  if (p.owner) foot += '<span class="chip"><span class="avatar">' + esc(p.owner.trim().charAt(0)) + '</span>' + esc(p.owner) + '</span>';
+  if (p.deadline) foot += '<span class="chip' + (overdue ? ' overdue' : '') + '">⏱ ' + fmtDeadline(p.deadline) + (overdue ? ' 已逾期' : '') + '</span>';
+  let ib = '';
+  if (all.length){
+    ib = unres.length
+      ? '<span class="issue-badge" title="未完成事项">' + ICONS.list + unres.length + '</span>'
+      : '<span class="issue-badge done-all" title="全部完成">✓</span>';
+  }
+  return (
+    '<div class="prow' + (expandedProjectId === p.id ? ' open' : '') + '" data-action="toggle-expand" data-id="' + p.id + '" draggable="true">' +
+      '<span class="st" data-action="cycle-status" data-id="' + p.id + '" title="点击切换状态"><i class="st-dot" style="background:' + st.color + '"></i>' + st.label + '</span>' +
+      '<span class="prow-name">' + esc(p.name) + '</span>' +
+      '<div class="pbar" title="进度 = 事项完成率"><i style="width:' + ratePct + '%"></i></div>' +
+      '<span class="ppct">' + rateTxt + '</span>' +
+      foot + ib +
+      '<svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>' +
+    '</div>'
+  );
+}
+
+function psubHTML(p){
+  const items = projectIssues(p.id).slice().sort((a,b) =>
+    (a.resolved - b.resolved) || ({high:0,medium:1,low:2}[a.severity] - {high:0,medium:1,low:2}[b.severity]));
+  return (
+    '<div class="psub">' +
+      items.map(i => {
+        const notes = Array.isArray(i.notes) ? i.notes : [];
+        const lastNote = notes.length ? notes[notes.length - 1] : null;
+        return (
+          '<div class="psub-item' + (i.resolved ? ' done' : '') + '">' +
+            '<input type="checkbox" data-change="toggle-issue" data-id="' + i.id + '"' + (i.resolved ? ' checked' : '') + ' title="标记完成/重开">' +
+            '<span class="psub-main" data-action="edit-issue" data-id="' + i.id + '" title="点击编辑">' +
+              '<i class="pdot sev-' + i.severity + '"></i>' +
+              '<span class="ptitle-wrap">' +
+                '<span class="ptitle">' + esc(i.title) + '</span>' +
+                (lastNote ? '<span class="pnote">' + esc(lastNote.text) + ' · ' + fmtHist(lastNote.ts) + '</span>' : '') +
+              '</span>' +
+            '</span>' +
+            '<button class="icon-btn psub-note' + (openNotesIssueId === i.id ? ' on' : '') + '" data-action="note-issue" data-id="' + i.id + '" title="' + (openNotesIssueId === i.id ? '收起进展记录' : '进展记录') + '">' + ICONS.note + '</button>' +
+            '<button class="icon-btn psub-del" data-action="delete-issue" data-id="' + i.id + '" title="删除事项">' + ICONS.trash + '</button>' +
+          '</div>' +
+          (openNotesIssueId === i.id ? notesPanelHTML(i) : '')
+        );
+      }).join('') +
+      '<form class="psub-add" data-pid="' + p.id + '">' +
+        '<input placeholder="＋ 添加事项，回车" maxlength="80">' +
+        '<select title="优先级"><option value="high">高</option><option value="medium" selected>中</option><option value="low">低</option></select>' +
+      '</form>' +
+    '</div>'
+  );
+}
+
+function notesPanelHTML(issue){
+  const notes = Array.isArray(issue.notes) ? issue.notes : [];
+  return (
+    '<div class="psub-notes">' +
+      (notes.length
+        ? notes.map((n, idx) =>
+            '<div class="pnote-row">' +
+              '<span class="pnote-txt" data-action="edit-note" data-issue="' + issue.id + '" data-nidx="' + idx + '" title="点击编辑">' + esc(n.text) + '</span>' +
+              '<span class="pnote-ts">' + fmtHist(n.ts) + '</span>' +
+              '<button class="icon-btn" data-action="delete-note" data-issue="' + issue.id + '" data-nidx="' + idx + '" title="删除">' + ICONS.trash + '</button>' +
+            '</div>'
+          ).join('')
+        : '<div class="pnote-empty">还没有进展记录，在下方输入第一条</div>') +
+      '<form class="psub-note-add" data-issue="' + issue.id + '">' +
+        '<input placeholder="记录进展，回车保存…" maxlength="200">' +
+      '</form>' +
+    '</div>'
+  );
+}
+
+function zoneHTML(goal){
+  const filtering = searchQ !== '' || statusFilter !== 'all';
+  const projects = state.projects
+    .filter(p => p.goalId === goal.id)
+    .sort((a,b) => ((Number(a.order)||0) - (Number(b.order)||0)))
+    .filter(matchesFilter);
+  if (filtering && !projects.length) return '';
+  const rates = projects.map(p => {
+    const t = projectIssues(p.id).length;
+    return t ? (projectIssues(p.id).filter(i => i.resolved).length / t) : null;
+  }).filter(r => r !== null);
+  const avg = rates.length ? Math.round(rates.reduce((s,r) => s + r, 0) / rates.length * 100) : null;
+  const body = projects.length
+    ? projects.map(pblockHTML).join('')
+    : '<div class="zone-empty" data-action="add-project" data-goal="' + goal.id + '">＋ 该目标下还没有项目，点击添加</div>';
+  return (
+    '<section class="zone' + (collapsedGoals.has(goal.id) ? ' collapsed' : '') + '" data-goal-zone="' + goal.id + '">' +
+      '<div class="zone-head">' +
+        '<button class="zc-btn" data-action="toggle-goal-collapse" data-id="' + goal.id + '" title="折叠 / 展开">' +
+          '<svg class="zc-chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>' +
+        '</button>' +
+        '<span class="zone-dot" style="background:' + goal.color + '"></span>' +
+        '<div class="zone-title-wrap">' +
+          '<div class="zone-name">' + esc(goal.name) + '</div>' +
+          (goal.description ? '<div class="zone-desc">' + esc(goal.description) + '</div>' : '') +
+          '<div class="zone-meta"><span class="zone-count">' + projects.length + ' 个项目</span>' +
+          '<div class="zone-avgbar"><i style="width:' + (avg === null ? 0 : avg) + '%"></i></div><span>' + (avg === null ? '暂无事项' : '平均完成 ' + avg + '%') + '</span></div>' +
+        '</div>' +
+        '<button class="icon-btn" data-action="add-project" data-goal="' + goal.id + '" title="添加项目">' + ICONS.plus + '</button>' +
+        '<button class="icon-btn" data-action="edit-goal" data-id="' + goal.id + '" title="编辑目标">' + ICONS.pencil + '</button>' +
+        '<button class="icon-btn" data-action="delete-goal" data-id="' + goal.id + '" title="删除目标">' + ICONS.trash + '</button>' +
+      '</div>' +
+      '<div class="zone-body" data-goal="' + goal.id + '">' + body + '</div>' +
+    '</section>'
+  );
+}
+
+function renderBoard(){
+  const board = $('#board');
+  if (!state.goals.length){
+    board.innerHTML =
+      '<div class="empty-state"><h2>沙盘还是空的</h2><p>先创建一个目标，再把项目挂到目标下推进。</p>' +
+      '<button class="btn btn-primary" data-action="add-goal">' + ICONS.plus + ' 新建第一个目标</button></div>';
+    return;
+  }
+  if (expandedProjectId && !matchesFilter(state.projects.find(x => x.id === expandedProjectId) || {})){
+    expandedProjectId = null;
+  }
+  const html = state.goals.map(zoneHTML).join('');
+  const filtering = searchQ !== '' || statusFilter !== 'all';
+  board.innerHTML = html || (filtering
+    ? '<div class="empty-state"><h2>没有匹配的项目</h2><p>换个关键词或筛选条件试试。</p></div>'
+    : '');
+}
+
+function renderAll(){ renderStats(); renderBoard(); }
+
+/* ================= 行内展开（项目详情） ================= */
+function pexpHTML(p){
+  const issues = projectIssues(p.id).slice().sort((a,b) => (a.resolved - b.resolved) || ({high:0,medium:1,low:2}[a.severity] - {high:0,medium:1,low:2}[b.severity]));
+  const goalOpts = state.goals.map(g => '<option value="' + g.id + '"' + (g.id === p.goalId ? ' selected' : '') + '>' + esc(g.name) + '</option>').join('');
+  const statusOpts = Object.keys(STATUS).map(k => '<option value="' + k + '"' + (k === p.status ? ' selected' : '') + '>' + STATUS[k].label + '</option>').join('');
+  const issueList = issues.length ? issues.map(i => {
+    const notes = Array.isArray(i.notes) ? i.notes : [];
+    const lastNote = notes.length ? notes[notes.length - 1] : null;
+    return (
+    '<div class="issue-item' + (i.resolved ? ' resolved' : '') + '">' +
+      '<input type="checkbox" class="issue-check" data-change="toggle-issue" data-id="' + i.id + '"' + (i.resolved ? ' checked' : '') + ' title="标记完成/重开">' +
+      '<span class="sev-tag sev-' + i.severity + '" title="优先级">' + SEVERITY[i.severity] + '</span>' +
+      '<span class="issue-title" data-action="edit-issue" data-id="' + i.id + '" title="点击编辑">' + esc(i.title) + '</span>' +
+      '<button class="icon-btn" data-action="note-issue" data-id="' + i.id + '" title="记录进展">' + ICONS.note + '</button>' +
+      '<button class="icon-btn" data-action="delete-issue" data-id="' + i.id + '" title="删除事项">' + ICONS.trash + '</button>' +
+      (lastNote ? '<div class="issue-note-line"><span class="pnote">' + esc(lastNote.text) + ' · ' + fmtHist(lastNote.ts) + '</span></div>' : '') +
+    '</div>'
+    );
+  }).join('') : '<div style="color:var(--faint);font-size:12.5px;padding:6px 2px">还没有事项，添加后自动计算进度</div>';
+  return (
+    '<div class="pexp">' +
+      '<div class="field-row">' +
+        '<div class="field"><label>项目名称</label><input id="d-name" value="' + esc(p.name) + '" maxlength="60"></div>' +
+        '<div class="field"><label>负责人</label><input id="d-owner" value="' + esc(p.owner) + '" maxlength="20"></div>' +
+      '</div>' +
+      '<div class="field-row">' +
+        '<div class="field"><label>所属目标</label><select id="d-goal">' + goalOpts + '</select></div>' +
+        '<div class="field"><label>状态</label><select id="d-status">' + statusOpts + '</select></div>' +
+        '<div class="field"><label>截止日期</label><input id="d-deadline" type="date" value="' + esc(p.deadline) + '"></div>' +
+      '</div>' +
+      '<div class="field"><label>描述</label><textarea id="d-desc" maxlength="300">' + esc(p.description) + '</textarea></div>' +
+      '<div style="display:flex;align-items:center;gap:12px;margin-top:4px">' +
+        '<button class="btn" data-action="delete-project" data-id="' + p.id + '" style="color:var(--red)">' + ICONS.trash + ' 删除项目</button>' +
+        '<span class="saved-at" id="d-saved-at"></span>' +
+      '</div>' +
+      '<div class="sec-title">事项跟踪（' + issues.filter(i => i.resolved).length + '/' + issues.length + ' 已完成）</div>' +
+      issueList +
+      '<form class="issue-add" id="issue-add-form">' +
+        '<input id="new-issue-title" placeholder="要做什么事？回车添加" maxlength="80">' +
+        '<select id="new-issue-sev" title="优先级"><option value="high">高</option><option value="medium" selected>中</option><option value="low">低</option></select>' +
+        '<button type="submit" class="btn btn-primary" title="添加事项">' + ICONS.plus + '</button>' +
+      '</form>' +
+      '<div class="meta-line">所有修改自动保存 · 最近更新：' + fmtTs(p.updatedAt) + '</div>' +
+    '</div>'
+  );
+}
+
+function toggleExpand(pid){
+  if (drawerSaveTimer) applyDrawerEdits(false);
+  expandedProjectId = expandedProjectId === pid ? null : pid;
+  renderAll();
+}
+function collapseExpand(){
+  if (drawerSaveTimer) applyDrawerEdits(false);
+  if (expandedProjectId !== null){
+    expandedProjectId = null;
+    renderAll();
+  }
+}
+function renderAllKeepFocus(){
+  const ae = document.activeElement;
+  const id = ae && ae.id;
+  const pos = id && typeof ae.selectionStart === 'number' ? ae.selectionStart : null;
+  renderAll();
+  if (id){
+    const el = document.getElementById(id);
+    if (el){
+      el.focus();
+      if (pos !== null && typeof el.setSelectionRange === 'function'){ try{ el.setSelectionRange(pos, pos); }catch(e){} }
+    }
+  }
+}
+let drawerSaveTimer = null;
+function queueDrawerSave(){
+  clearTimeout(drawerSaveTimer);
+  drawerSaveTimer = setTimeout(() => applyDrawerEdits(true), 400);
+}
+function applyDrawerEdits(rerender){
+  clearTimeout(drawerSaveTimer);
+  drawerSaveTimer = null;
+  const p = state.projects.find(x => x.id === expandedProjectId);
+  if (!p || !$('#d-name')) return;
+  const name = $('#d-name').value.trim();
+  if (name) p.name = name;
+  p.goalId = $('#d-goal').value;
+  p.owner = $('#d-owner').value.trim();
+  p.status = $('#d-status').value;
+  p.deadline = $('#d-deadline').value || '';
+  p.description = $('#d-desc').value.trim();
+  p.updatedAt = Date.now();
+  save();
+  if (rerender !== false) renderAllKeepFocus();
+  const s = $('#d-saved-at');
+  if (s) s.textContent = '已保存 ' + fmtHist(Date.now());
+}
+
+/* ================= 弹窗 ================= */
+function openGoalModal(goalId){
+  editingGoalId = goalId || null;
+  const g = goalId ? state.goals.find(x => x.id === goalId) : null;
+  $('#goal-modal-title span').textContent = g ? '编辑目标' : '新建目标';
+  $('#goal-name').value = g ? g.name : '';
+  $('#goal-desc').value = g ? g.description : '';
+  selectedColor = g ? g.color : PALETTE[state.goals.length % PALETTE.length];
+  renderSwatches();
+  $('#goal-modal').classList.add('open');
+  setTimeout(() => $('#goal-name').focus(), 50);
+}
+function renderSwatches(){
+  $('#goal-swatches').innerHTML = PALETTE.map(c =>
+    '<span class="swatch' + (c === selectedColor ? ' sel' : '') + '" data-color="' + c + '" style="background:' + c + '"></span>'
+  ).join('');
+}
+
+function openProjectModal(projectId, presetGoalId){
+  editingProjectId = projectId || null;
+  const p = projectId ? state.projects.find(x => x.id === projectId) : null;
+  $('#project-modal-title span').textContent = p ? '编辑项目' : '新建项目';
+  $('#project-goal').innerHTML = state.goals.map(g =>
+    '<option value="' + g.id + '"' + ((p ? p.goalId : presetGoalId) === g.id ? ' selected' : '') + '>' + esc(g.name) + '</option>'
+  ).join('');
+  $('#project-status').innerHTML = Object.keys(STATUS).map(k =>
+    '<option value="' + k + '"' + (p && p.status === k ? ' selected' : '') + '>' + STATUS[k].label + '</option>'
+  ).join('');
+  $('#project-name').value = p ? p.name : '';
+  $('#project-owner').value = p ? p.owner : '';
+  $('#project-deadline').value = p ? p.deadline : '';
+  $('#project-desc').value = p ? p.description : '';
+  $('#project-modal').classList.add('open');
+  setTimeout(() => $('#project-name').focus(), 50);
+}
+
+/* 确认弹窗（Promise 风格） */
+let confirmCleanup = null;
+function confirmDialog(opts){
+  const { title = '确认操作', message = '', danger = false, requireText = null } = opts || {};
+  return new Promise(resolve => {
+    const m = $('#confirm-modal'), ok = $('#confirm-ok'), input = $('#confirm-input');
+    $('#confirm-title').textContent = title;
+    $('#confirm-msg').textContent = message;
+    const wrap = $('#confirm-input-wrap');
+    if (requireText){
+      wrap.style.display = 'block';
+      input.value = '';
+      input.placeholder = '输入「' + requireText + '」以确认';
+      ok.disabled = true;
+    } else {
+      wrap.style.display = 'none';
+      ok.disabled = false;
+    }
+    ok.className = 'btn ' + (danger ? 'btn-danger' : 'btn-primary');
+    m.classList.add('open');
+    if (requireText) setTimeout(() => input.focus(), 50);
+
+    const finish = val => {
+      m.classList.remove('open');
+      ok.removeEventListener('click', onOk);
+      input.removeEventListener('input', onInput);
+      confirmCleanup = null;
+      resolve(val);
+    };
+    const onOk = () => finish(true);
+    const onInput = () => { ok.disabled = input.value.trim() !== requireText; };
+    ok.addEventListener('click', onOk);
+    input.addEventListener('input', onInput);
+    confirmCleanup = () => finish(false);
+  });
+}
+
+/* 输入弹窗（Promise 风格，取消返回 null） */
+let inputCleanup = null;
+function inputDialog(opts){
+  const { title = '输入', label = '名称', value = '', okText = '确定', maxlength = 30 } = opts || {};
+  return new Promise(resolve => {
+    const m = $('#input-modal'), ok = $('#input-ok'), input = $('#input-field');
+    $('#input-title').textContent = title;
+    $('#input-label').textContent = label;
+    input.value = value;
+    try { input.maxLength = maxlength; } catch(e){}
+    m.classList.add('open');
+    setTimeout(() => { input.focus(); input.select(); }, 50);
+    let settled = false;
+    const finish = val => {
+      if (settled) return;
+      settled = true;
+      m.classList.remove('open');
+      ok.removeEventListener('click', onOk);
+      input.removeEventListener('keydown', onKey);
+      inputCleanup = null;
+      resolve(val);
+    };
+    const onOk = () => finish(input.value.trim());
+    const onKey = ev => {
+      if (ev.isComposing) return; // 中文输入法组合期间不响应回车/Esc
+      if (ev.key === 'Enter'){ ev.preventDefault(); onOk(); }
+      else if (ev.key === 'Escape'){ ev.preventDefault(); finish(null); }
+    };
+    ok.addEventListener('click', onOk);
+    input.addEventListener('keydown', onKey);
+    inputCleanup = () => finish(null);
+  });
+}
+
+function renderBoardSwitcher(){
+  const ctl = $('#board-ctl');
+  ctl.style.display = (serverMode && currentUser) ? 'block' : 'none';
+  if (!serverMode || !currentUser) return;
+  const cur = boardsList.find(x => x.id === currentBoardId);
+  $('#board-btn').innerHTML = ICONS.layers +
+    '<span class="bb-name">' + esc(cur ? cur.name : '选择沙盘') + '</span>' + ICONS.chevDown;
+  $('#board-menu-list').innerHTML = boardsList.map(b =>
+    '<div class="board-item' + (b.id === currentBoardId ? ' active' : '') + '" role="menuitem" tabindex="0" data-board-id="' + esc(b.id) + '">' +
+      '<span class="bi-check">' + ICONS.check + '</span>' +
+      '<span class="board-item-main">' +
+        '<span class="board-item-name">' + esc(b.name) + '</span>' +
+        '<span class="board-item-time">更新于 ' + fmtHist(b.updatedAt) + '</span>' +
+      '</span>' +
+      '<span class="board-item-acts">' +
+        '<button class="icon-btn" data-action="rename-board" data-id="' + esc(b.id) + '" title="重命名">' + ICONS.pencil + '</button>' +
+        '<button class="icon-btn" data-action="delete-board" data-id="' + esc(b.id) + '" title="删除">' + ICONS.trash + '</button>' +
+      '</span>' +
+    '</div>'
+  ).join('') || '<div class="hist-empty">还没有沙盘</div>';
+}
+function toggleBoardMenu(force){
+  const open = force !== undefined ? force : !$('#board-ctl').classList.contains('open');
+  $('#board-ctl').classList.toggle('open', open);
+  $('#board-menu').classList.toggle('open', open);
+}
+function closeBoardMenu(){ toggleBoardMenu(false); }
+
+/* ================= Toast ================= */
+function toast(msg, type){
+  const el = document.createElement('div');
+  el.className = 'toast ' + (type || 'ok');
+  el.textContent = msg;
+  $('#toast-wrap').appendChild(el);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 320); }, 2400);
+}
+
+/* ================= 数据操作 ================= */
+async function deleteGoalFlow(goalId){
+  const g = state.goals.find(x => x.id === goalId);
+  if (!g) return;
+  const cnt = state.projects.filter(p => p.goalId === goalId).length;
+  const ok = await confirmDialog({
+    title: '删除目标',
+    message: '将删除目标「' + g.name + '」及其下属 ' + cnt + ' 个项目和全部问题记录，此操作不可恢复。',
+    danger: true,
+    requireText: g.name,
+  });
+  if (!ok) return;
+  const pids = new Set(state.projects.filter(p => p.goalId === goalId).map(p => p.id));
+  state.projects = state.projects.filter(p => !pids.has(p.id));
+  state.issues = state.issues.filter(i => !pids.has(i.projectId));
+  state.goals = state.goals.filter(x => x.id !== goalId);
+  save(); renderAll();
+  toast('目标已删除');
+}
+async function deleteProjectFlow(pid){
+  const p = state.projects.find(x => x.id === pid);
+  if (!p) return;
+  const ok = await confirmDialog({ title:'删除项目', message:'确定删除项目「' + p.name + '」？其问题记录将一并删除。', danger:true });
+  if (!ok) return;
+  state.projects = state.projects.filter(x => x.id !== pid);
+  state.issues = state.issues.filter(i => i.projectId !== pid);
+  expandedProjectId = null; save(); renderAll();
+  toast('项目已删除');
+}
+
+/* ================= 导入导出 ================= */
+function exportJSON(){
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type:'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '项目沙盘-' + todayStr() + '.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  try { localStorage.setItem('psb-last-export', String(Date.now())); } catch(e){}
+  toast('已导出 JSON 备份');
+}
+function importJSON(file){
+  const reader = new FileReader();
+  reader.onload = async () => {
+    let data = null;
+    try { data = JSON.parse(reader.result); } catch(e){ toast('文件不是合法的 JSON', 'err'); return; }
+    if (!data || !Array.isArray(data.goals) || !Array.isArray(data.projects) || !Array.isArray(data.issues)){
+      toast('JSON 结构不符合沙盘格式', 'err'); return;
+    }
+    const ok = await confirmDialog({ title:'导入数据', message:'导入将覆盖当前全部数据（' + state.goals.length + ' 个目标 / ' + state.projects.length + ' 个项目），当前状态会先自动存入历史版本。确定继续？', danger:true });
+    if (!ok) return;
+    state = normalize(data);
+    save(); renderAll();
+    toast('导入成功');
+  };
+  reader.readAsText(file);
+}
+
+/* ================= 历史版本 ================= */
+function fmtHist(ts){
+  const d = new Date(ts), n = new Date();
+  const hm = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  const sameDay = d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+  return (sameDay ? '今天' : (d.getMonth()+1) + '月' + d.getDate() + '日') + ' ' + hm;
+}
+function openHistoryModal(){ renderHistoryList(); $('#history-modal').classList.add('open'); }
+/* ================= 事项动态（按事项分组的时间线对比） ================= */
+function openSnapModal(){ renderSnapList(); $('#snap-modal').classList.add('open'); }
+function renderSnapList(){
+  const blocks = [];
+  const pending = [];
+  state.goals.forEach(g => {
+    state.projects.filter(p => p.goalId === g.id).forEach(p => {
+      projectIssues(p.id).forEach(i => {
+        const notes = Array.isArray(i.notes) ? i.notes : [];
+        if (!notes.length){ pending.push({ goal:g, project:p, issue:i }); return; }
+        blocks.push({ goal:g, project:p, issue:i, notes });
+      });
+    });
+  });
+  blocks.sort((a,b) => b.notes[b.notes.length-1].ts - a.notes[a.notes.length-1].ts);
+  let html = blocks.map(b => {
+    const sorted = b.notes.slice().sort((x,y) => x.ts - y.ts);
+    const lastIdx = sorted.length - 1;
+    return (
+      '<div class="snap-item">' +
+        '<div class="snap-head">' +
+          '<div style="flex:1;min-width:0">' +
+            '<div class="snap-name' + (b.issue.resolved ? ' done-txt' : '') + '">' + esc(b.issue.title) + '</div>' +
+            '<div class="snap-goal">' + esc(b.project.name) + ' · ' + esc(b.goal.name) + '</div>' +
+          '</div>' +
+          '<span class="zone-count">' + sorted.length + ' 条记录</span>' +
+        '</div>' +
+        sorted.map((n, idx) =>
+          '<div class="snap-line' + (idx === lastIdx ? ' latest' : '') + '">' +
+            '<i class="snap-tick"></i>' +
+            '<span class="snap-txt" data-action="edit-note" data-issue="' + b.issue.id + '" data-nidx="' + b.notes.indexOf(n) + '" title="点击编辑">' + esc(n.text) + '</span>' +
+            '<span class="snap-when">' + fmtHist(n.ts) + '</span>' +
+            '<button class="icon-btn" data-action="delete-note" data-issue="' + b.issue.id + '" data-nidx="' + b.notes.indexOf(n) + '" title="删除">' + ICONS.trash + '</button>' +
+          '</div>'
+        ).join('') +
+      '</div>'
+    );
+  }).join('');
+  if (pending.length){
+    html += '<div class="snap-pending">' +
+      '<div class="snap-pending-title">以下 ' + pending.length + ' 个事项还没有进展记录</div>' +
+      pending.map(x => '<span class="chip">' + esc(x.issue.title) + '</span>').join(' ') +
+    '</div>';
+  }
+  $('#snap-list').innerHTML = html || '<div class="hist-empty">还没有事项</div>';
+}
+async function renderHistoryList(){
+  const h = (await fetchHistory()).slice().reverse();
+  const el = $('#history-list');
+  if (!h.length){ el.innerHTML = '<div class="hist-empty">还没有历史版本，做一次修改后就会自动留档</div>'; return; }
+  el.innerHTML = h.map((s, i) => {
+    let sum = '';
+    try {
+      const d = JSON.parse(s.data);
+      sum = (d.goals||[]).length + ' 个目标 · ' + (d.projects||[]).length + ' 个项目 · ' + (d.issues||[]).length + ' 条问题';
+    } catch(e){ sum = '无法解析的快照'; }
+    const cur = i === 0 ? '<span class="hist-cur">当前</span>' : '';
+    const btn = i === 0 ? '' : '<button class="btn" data-action="restore-history" data-ts="' + s.ts + '">恢复此版</button>';
+    return '<div class="hist-item"><div class="hist-info"><div class="hist-time">' + fmtHist(s.ts) + cur + '</div><div class="hist-sum">' + sum + '</div></div>' + btn + '</div>';
+  }).join('');
+}
+async function restoreHistory(ts){
+  const entry = (await fetchHistory()).find(x => String(x.ts) === String(ts));
+  if (!entry) return;
+  let data = null;
+  try { data = JSON.parse(entry.data); } catch(e){ toast('该快照无法解析', 'err'); return; }
+  const ok = await confirmDialog({ title:'恢复历史版本', message:'将恢复到 ' + fmtHist(entry.ts) + ' 的状态。当前状态在恢复前会先自动存档，随时可以再切回来。' });
+  if (!ok) return;
+  state = normalize(data);
+  save(); renderAll();
+  $('#history-modal').classList.remove('open');
+  toast('已恢复到 ' + fmtHist(entry.ts));
+}
+
+/* ================= 自动备份（本地文件） ================= */
+let backupHandle = null, backupName = '', backupReady = false, backupNeedsPerm = false;
+let backupWriteTimer = null;
+
+function idbOpen(){
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('psb-meta', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+async function idbSet(k, v){
+  const db = await idbOpen();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('kv', 'readwrite');
+    tx.objectStore('kv').put(v, k);
+    tx.oncomplete = res;
+    tx.onerror = () => rej(tx.error);
+  });
+}
+async function idbGet(k){
+  const db = await idbOpen();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('kv', 'readonly');
+    const q = tx.objectStore('kv').get(k);
+    q.onsuccess = () => res(q.result);
+    q.onerror = () => rej(q.error);
+  });
+}
+async function writeFileHandle(handle){
+  const w = await handle.createWritable();
+  await w.write(JSON.stringify(state, null, 2));
+  await w.close();
+}
+function scheduleBackupWrite(){
+  if (!backupHandle || !backupReady) return;
+  clearTimeout(backupWriteTimer);
+  backupWriteTimer = setTimeout(() => {
+    writeFileHandle(backupHandle).catch(() => toast('自动备份写入失败，请检查备份文件是否被移动或删除', 'err'));
+  }, 400);
+}
+function updateBackupUI(){
+  const b = $('#btn-backup');
+  if (!backupHandle){
+    b.innerHTML = ICONS.save;
+    b.title = '自动备份：未开启。点击绑定本地 .json 文件，之后每次保存自动写入（Chrome/Edge）';
+  } else if (backupNeedsPerm){
+    b.innerHTML = ICONS.save + '<span class="dot" style="background:var(--amber);margin-left:4px"></span>';
+    b.title = '自动备份：需重新授权文件「' + esc(backupName) + '」，点击恢复';
+  } else {
+    b.innerHTML = ICONS.save + '<span class="dot" style="background:var(--green);margin-left:4px"></span>';
+    b.title = '自动备份已开启：每次保存写入「' + esc(backupName) + '」。点击断开';
+  }
+}
+async function initBackup(){
+  try {
+    const handle = await idbGet('backup-handle');
+    if (handle){
+      backupHandle = handle;
+      backupName = handle.name || '备份文件';
+      let perm = 'granted';
+      if (handle.queryPermission) perm = await handle.queryPermission({ mode:'readwrite' });
+      if (perm === 'granted'){ backupReady = true; scheduleBackupWrite(); }
+      else backupNeedsPerm = true;
+    }
+  } catch(e){}
+  updateBackupUI();
+}
+async function handleBackupClick(){
+  if (!window.showSaveFilePicker){
+    toast('此浏览器不支持自动写盘（需 Chrome/Edge），请养成点「导出」的习惯', 'err');
+    return;
+  }
+  try {
+    if (!backupHandle){
+      const handle = await window.showSaveFilePicker({
+        suggestedName: '项目沙盘备份.json',
+        types: [{ description:'JSON', accept:{ 'application/json':['.json'] } }],
+      });
+      await idbSet('backup-handle', handle);
+      backupHandle = handle;
+      backupName = handle.name;
+      backupNeedsPerm = false; backupReady = true;
+      updateBackupUI();
+      await writeFileHandle(handle);
+      toast('已开启自动备份：每次保存都会写入「' + handle.name + '」');
+    } else if (backupNeedsPerm){
+      const perm = await backupHandle.requestPermission({ mode:'readwrite' });
+      if (perm === 'granted'){
+        backupNeedsPerm = false; backupReady = true;
+        updateBackupUI(); scheduleBackupWrite();
+        toast('备份授权已恢复');
+      } else toast('未授权，自动备份暂不可用', 'err');
+    } else {
+      const ok = await confirmDialog({ title:'断开自动备份', message:'断开后不再自动写入「' + backupName + '」，已生成的备份文件不受影响。' });
+      if (!ok) return;
+      await idbSet('backup-handle', null);
+      backupHandle = null; backupName = ''; backupReady = false;
+      updateBackupUI();
+      toast('已断开自动备份');
+    }
+  } catch(e){
+    if (e && e.name === 'AbortError') return;
+    toast('自动备份不可用：' + (e && e.message ? e.message : e), 'err');
+  }
+}
+
+/* ================= 事件绑定 ================= */
+document.addEventListener('click', e => {
+  const closer = e.target.closest('[data-close]');
+  if (closer){
+    $('#' + closer.dataset.close)?.classList.remove('open');
+    return;
+  }
+  if (e.target.closest('[data-confirm-cancel]')){
+    if (confirmCleanup) confirmCleanup();
+    return;
+  }
+  if (e.target.closest('[data-input-cancel]')){
+    if (inputCleanup) inputCleanup();
+    return;
+  }
+  const sw = e.target.closest('.swatch');
+  if (sw){ selectedColor = sw.dataset.color; renderSwatches(); return; }
+
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const act = el.dataset.action, id = el.dataset.id;
+
+  switch(act){
+    case 'add-goal': openGoalModal(null); break;
+    case 'edit-goal': openGoalModal(id); break;
+    case 'delete-goal': deleteGoalFlow(id); break;
+    case 'add-project':
+      if (!state.goals.length){ toast('请先创建一个目标', 'err'); break; }
+      openProjectModal(null, el.dataset.goal || (state.goals[0] && state.goals[0].id));
+      break;
+    case 'toggle-expand': toggleExpand(id); break;
+    case 'note-issue': {
+      openNotesIssueId = openNotesIssueId === id ? null : id;
+      renderAll();
+      if (openNotesIssueId){
+        const ni = document.querySelector('.psub-notes .psub-note-add input');
+        if (ni) ni.focus();
+      }
+      break;
+    }
+    case 'edit-note': {
+      if (e.target.tagName === 'INPUT') break;
+      const issue = state.issues.find(i => i.id === el.dataset.issue);
+      const nidx = Number(el.dataset.nidx);
+      if (!issue || !issue.notes || !issue.notes[nidx] || el.dataset.editing) break;
+      el.dataset.editing = '1';
+      const original = issue.notes[nidx].text;
+      el.innerHTML = '<input class="psub-edit" value="' + esc(original) + '" maxlength="200">';
+      const input = el.querySelector('input');
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+      let noteDone = false;
+      const commitNote = saveIt => {
+        if (noteDone) return;
+        noteDone = true;
+        const val = input.value.trim();
+        if (saveIt && val && val !== original){
+          issue.notes[nidx].text = val;
+          const pp = state.projects.find(x => x.id === issue.projectId);
+          if (pp) pp.updatedAt = Date.now();
+          save(); renderAll();
+          toast('进展已更新');
+        } else {
+          renderAll();
+        }
+      };
+      input.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter'){ ev.preventDefault(); commitNote(true); }
+        else if (ev.key === 'Escape'){ ev.preventDefault(); commitNote(false); }
+      });
+      input.addEventListener('blur', () => commitNote(true));
+      break;
+    }
+    case 'delete-note': {
+      const issue = state.issues.find(i => i.id === el.dataset.issue);
+      const nidx = Number(el.dataset.nidx);
+      if (!issue || !issue.notes || !issue.notes[nidx]) break;
+      issue.notes.splice(nidx, 1);
+      save(); renderAll();
+      toast('已删除该条进展');
+      break;
+    }
+    case 'toggle-goal-collapse': {
+      if (collapsedGoals.has(id)) collapsedGoals.delete(id);
+      else {
+        collapsedGoals.add(id);
+        if (state.projects.some(p => p.id === expandedProjectId && p.goalId === id)) expandedProjectId = null;
+      }
+      saveCollapsed(); renderAll();
+      break;
+    }
+    case 'edit-issue': {
+      if (e.target.tagName === 'INPUT') break;
+      const issue = state.issues.find(i => i.id === id);
+      if (!issue || el.dataset.editing) break;
+      el.dataset.editing = '1';
+      const original = issue.title;
+      el.innerHTML = '<input class="psub-edit" value="' + esc(original) + '" maxlength="80">';
+      const input = el.querySelector('input');
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+      let editDone = false;
+      const commitEdit = saveIt => {
+        if (editDone) return;
+        editDone = true;
+        const val = input.value.trim();
+        if (saveIt && val && val !== original){
+          issue.title = val;
+          const pp = state.projects.find(x => x.id === issue.projectId);
+          if (pp) pp.updatedAt = Date.now();
+          save(); renderAll();
+          toast('事项已更新');
+        } else {
+          renderAll();
+        }
+      };
+      input.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter'){ ev.preventDefault(); commitEdit(true); }
+        else if (ev.key === 'Escape'){ ev.preventDefault(); commitEdit(false); }
+      });
+      input.addEventListener('blur', () => commitEdit(true));
+      break;
+    }
+    case 'cycle-status': {
+      const p = state.projects.find(x => x.id === id);
+      if (p){
+        p.status = STATUS_CYCLE[(STATUS_CYCLE.indexOf(p.status) + 1) % STATUS_CYCLE.length];
+        p.updatedAt = Date.now();
+        save(); renderAll();
+      }
+      break;
+    }
+    case 'delete-project': deleteProjectFlow(id); break;
+    case 'delete-issue': {
+      state.issues = state.issues.filter(i => i.id !== id);
+      save(); renderAll();
+      break;
+    }
+    case 'export': exportJSON(); break;
+    case 'import': $('#import-file').click(); break;
+    case 'open-history': openHistoryModal(); break;
+    case 'show-snap-compare': openSnapModal(); break;
+    case 'restore-history': restoreHistory(el.dataset.ts); break;
+    case 'toggle-backup': handleBackupClick(); break;
+    case 'new-board': closeBoardMenu(); newBoardFlow(); break;
+    case 'rename-board': closeBoardMenu(); renameBoardFlow(id); break;
+    case 'delete-board': closeBoardMenu(); deleteBoardFlow(id); break;
+    case 'show-auth': openAuth('login'); break;
+    case 'logout': logoutFlow(); break;
+  }
+});
+
+// 表单提交
+$('#goal-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const name = $('#goal-name').value.trim();
+  if (!name) return;
+  if (editingGoalId){
+    const g = state.goals.find(x => x.id === editingGoalId);
+    if (g){ g.name = name; g.description = $('#goal-desc').value.trim(); g.color = selectedColor; }
+  } else {
+    state.goals.push({ id:uid(), name, description:$('#goal-desc').value.trim(), color:selectedColor, createdAt:Date.now() });
+  }
+  $('#goal-modal').classList.remove('open');
+  save(); renderAll();
+  toast(editingGoalId ? '目标已更新' : '目标已创建');
+});
+$('#project-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const name = $('#project-name').value.trim();
+  const goalId = $('#project-goal').value;
+  if (!name || !goalId) return;  if (editingProjectId){
+    const p = state.projects.find(x => x.id === editingProjectId);
+    if (p){
+      p.name = name; p.goalId = goalId;
+      p.owner = $('#project-owner').value.trim();
+      p.status = $('#project-status').value;
+      p.deadline = $('#project-deadline').value || '';
+      p.description = $('#project-desc').value.trim();
+      p.updatedAt = Date.now();
+    }
+  } else {
+    state.projects.push({
+      id:uid(), goalId, name,
+      owner:$('#project-owner').value.trim(),
+      progress:0, status:$('#project-status').value,
+      order:Date.now(),
+      deadline:$('#project-deadline').value || '',
+      description:$('#project-desc').value.trim(),
+      createdAt:Date.now(), updatedAt:Date.now(),
+    });
+  }
+  $('#project-modal').classList.remove('open');
+  save(); renderAll();
+  toast(editingProjectId ? '项目已更新' : '项目已创建');
+});
+document.addEventListener('submit', e => {
+  const f = e.target;
+  const isDrawer = f.id === 'issue-add-form';
+  const isInline = f.classList && f.classList.contains('psub-add');
+  const isNoteAdd = f.classList && f.classList.contains('psub-note-add');
+  if (!isDrawer && !isInline && !isNoteAdd) return;
+  e.preventDefault();
+  if (isNoteAdd){
+    const issue = state.issues.find(x => x.id === f.dataset.issue);
+    const val = f.querySelector('input').value.trim();
+    if (!issue || !val) return;
+    if (!Array.isArray(issue.notes)) issue.notes = [];
+    issue.notes.push({ ts: Date.now(), text: val });
+    const pp = state.projects.find(x => x.id === issue.projectId);
+    if (pp) pp.updatedAt = Date.now();
+    save(); renderAll();
+    const ni = document.querySelector('.psub-note-add[data-issue="' + issue.id + '"] input');
+    if (ni) ni.focus();
+    toast('进展已记录');
+    return;
+  }
+  const pid = isDrawer ? expandedProjectId : f.dataset.pid;
+  const title = f.querySelector('input').value.trim();
+  const sev = f.querySelector('select').value;
+  if (!pid) return;
+  if (!title){ toast('请填写事项内容', 'err'); return; }
+  state.issues.push({ id:uid(), projectId:pid, title, severity:sev, resolved:false, createdAt:Date.now(), notes:[] });
+  const p = state.projects.find(x => x.id === pid);
+  if (p) p.updatedAt = Date.now();
+  save(); renderAll();
+  if (isDrawer){
+    const ni = $('#new-issue-title');
+    if (ni) ni.focus();
+  } else {
+    const ni = document.querySelector('.pblock[data-pid="' + pid + '"] .psub-add input');
+    if (ni) ni.focus();
+  }
+  toast('事项已记录');
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const t = e.target;
+  if (t.id === 'confirm-input'){
+    e.preventDefault();
+    const ok = $('#confirm-ok');
+    if (!ok.disabled) ok.click();
+    return;
+  }
+  if (t.id === 'd-name' || t.id === 'd-owner' || t.id === 'd-desc'){
+    if (t.id === 'd-desc' && e.shiftKey) return;
+    e.preventDefault();
+    applyDrawerEdits();
+  }
+});
+
+document.addEventListener('input', e => {
+  if (['d-name','d-owner','d-desc'].includes(e.target.id)) queueDrawerSave();
+});
+document.addEventListener('change', e => {
+  const el = e.target.closest('[data-change="toggle-issue"]');
+  if (el){
+    const issue = state.issues.find(i => i.id === el.dataset.id);
+    if (issue){
+      issue.resolved = el.checked;
+      save(); renderAll();
+      toast(el.checked ? '事项已完成 ✓' : '事项已重开');
+    }
+    return;
+  }
+  if (['d-goal','d-status','d-deadline'].includes(e.target.id)) applyDrawerEdits();
+});
+$('#search').addEventListener('input', e => { searchQ = e.target.value.trim(); renderBoard(); });
+$('#status-filter').addEventListener('change', e => { statusFilter = e.target.value; renderBoard(); });
+// 导入文件
+$('#import-file').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (f) importJSON(f);
+  e.target.value = '';
+});
+// Esc 关闭最上层浮层
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if ($('#confirm-modal').classList.contains('open')){ if (confirmCleanup) confirmCleanup(); return; }
+  if ($('#input-modal').classList.contains('open')){ if (inputCleanup) inputCleanup(); return; }
+  if ($('#auth-modal').classList.contains('open')){ $('#auth-modal').classList.remove('open'); return; }
+  if ($('#board-ctl').classList.contains('open')){ closeBoardMenu(); return; }
+  collapseExpand();
+  ['#project-modal','#goal-modal','#history-modal','#snap-modal'].forEach(sel => $(sel).classList.remove('open'));
+});
+
+/* ================= 拖拽换目标 ================= */
+const boardEl = $('#board');
+boardEl.addEventListener('dragstart', e => {
+  const row = e.target.closest('.prow');
+  if (!row) return;
+  e.dataTransfer.setData('text/plain', row.dataset.id);
+  e.dataTransfer.effectAllowed = 'move';
+});
+boardEl.addEventListener('dragover', e => {
+  const body = e.target.closest('.zone-body');
+  if (!body) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  boardEl.querySelectorAll('.zone-body.drag-over').forEach(b => b.classList.remove('drag-over'));
+  body.classList.add('drag-over');
+});
+boardEl.addEventListener('drop', e => {
+  const body = e.target.closest('.zone-body');
+  if (!body) return;
+  e.preventDefault();
+  body.classList.remove('drag-over');
+  const pid = e.dataTransfer.getData('text/plain');
+  const p = state.projects.find(x => x.id === pid);
+  if (!p) return;
+  const targetGoal = body.dataset.goal;
+
+  const list = state.projects
+    .filter(x => x.goalId === targetGoal && x.id !== pid)
+    .sort((a,b) => ((Number(a.order)||0) - (Number(b.order)||0)));
+  let idx = list.length;
+  const overEl = e.target.closest('.pblock');
+  const overId = overEl ? overEl.dataset.pid : null;
+  if (overId && overId !== pid){
+    const overIdx = list.findIndex(x => x.id === overId);
+    if (overIdx >= 0){
+      const rect = overEl.getBoundingClientRect();
+      idx = e.clientY > rect.top + rect.height / 2 ? overIdx + 1 : overIdx;
+    }
+  }
+  list.splice(idx, 0, p);
+  const goalChanged = p.goalId !== targetGoal;
+  p.goalId = targetGoal;
+  p.updatedAt = Date.now();
+  list.forEach((x,i) => { x.order = i; });
+  save(); renderAll();
+  if (goalChanged)   toast('「' + p.name + '」已移动到新目标');
+});
+
+/* ================= 初始化 ================= */
+async function bootLoad(){
+  serverMode = await detectServer();
+  if (serverMode){
+    currentUser = await fetchMe();
+    renderUserCtl();
+    if (currentUser){
+      await loadFromServer();
+    } else {
+      state = EMPTY_STATE();
+      openAuth('login');
+    }
+  } else {
+    loadLocal();
+  }
+}
+(function init(){
+  $('#logo').innerHTML = ICONS.target + '<span>项目沙盘</span>';
+  $('#btn-add-goal').innerHTML = ICONS.plus + ' 新建目标';
+  $('#btn-history').innerHTML = ICONS.clock + ' 历史';
+  $('#btn-snap').innerHTML = ICONS.trend;
+  $('#btn-history').innerHTML = ICONS.clock;
+  $('#btn-export').innerHTML = ICONS.download;
+  $('#btn-import').innerHTML = ICONS.upload;
+  $('#history-x').innerHTML = ICONS.x;
+  $('#snap-x').innerHTML = ICONS.x;
+  $('#goal-x').innerHTML = ICONS.x;
+  $('#project-x').innerHTML = ICONS.x;
+  document.querySelector('.search-wrap').insertAdjacentHTML('afterbegin', ICONS.search);
+  $('#auth-x').innerHTML = ICONS.x;
+  $('#board-btn').addEventListener('click', e => { e.stopPropagation(); toggleBoardMenu(); });
+  $('#board-menu-list').addEventListener('click', e => {
+    if (e.target.closest('[data-action]')) return; // 行内重命名/删除交给全局委托
+    const item = e.target.closest('.board-item');
+    if (!item) return;
+    closeBoardMenu();
+    switchBoard(item.dataset.boardId);
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#board-ctl')) closeBoardMenu();
+  });
+  $('#a-submit').addEventListener('click', authSubmit);
+  $('#a-send').addEventListener('click', sendCode);
+  document.querySelectorAll('.auth-tab').forEach(t => t.addEventListener('click', () => setAuthMode(t.dataset.authTab)));
+  // 登录弹窗内回车提交（输入法组合期间不响应）
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || e.isComposing) return;
+    if (!$('#auth-modal').classList.contains('open')) return;
+    if (['a-email','a-pass','a-code'].includes(e.target.id)){
+      e.preventDefault();
+      authSubmit();
+    }
+  });
+  bootLoad().then(() => {
+    updateBackupUI();
+    initBackup();
+    renderAll();
+    if (corruptDetected) toast('检测到已存数据损坏，坏数据已隔离保留在本地；当前展示的是全新示例数据', 'err');
+    if (!serverMode && !window.showSaveFilePicker){
+      let last = 0;
+      try { last = Number(localStorage.getItem('psb-last-export')) || 0; } catch(e){}
+      if (Date.now() - last > 7 * DAY) setTimeout(() => toast('已经超过一周没有导出备份了，建议点「导出」把数据存一份到磁盘'), 1500);
+    }
+  });
+})();
+</script>
+</body>
+</html>

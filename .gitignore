@@ -1,0 +1,14 @@
+# 敏感配置（真实 SMTP 凭证）
+server/.env
+
+# 运行时产物
+*.db
+*.db-shm
+*.db-wal
+server/sandbox.log
+
+# 编译产物
+server/sandbox-server
+
+# 系统文件
+.DS_Store
