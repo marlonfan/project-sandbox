@@ -1,9 +1,9 @@
 # 构建阶段：纯 Go 交叉编译，无 CGO
 FROM golang:1.25-alpine AS build
 WORKDIR /src
-COPY go.mod go.sum ./
+COPY server/go.mod server/go.sum ./
 RUN go mod download
-COPY *.go ./
+COPY server/*.go ./
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/sandbox-server .
 
 # 运行阶段：alpine + CA 证书（SMTP TLS）+ 时区数据
