@@ -231,6 +231,48 @@
   .empty-state h2{font-size:19px;color:var(--text);margin-bottom:8px}
   .empty-state p{margin-bottom:22px;font-size:13.5px}
 
+  /* ---------- 快速记录（Cmd/Ctrl+K） ---------- */
+  #btn-quick{position:relative}
+  #btn-quick::after{
+    content:'⌘K';position:absolute;top:-6px;right:-6px;background:var(--panel);color:var(--faint);
+    font-size:9px;font-weight:700;border:1px solid var(--border);border-radius:5px;padding:0 3px;line-height:1.4;
+  }
+  #q-input{width:100%;font-size:15px;padding:11px 13px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text)}
+  #q-input:focus{outline:none;border-color:var(--accent)}
+  .q-row{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
+  .q-label{font-size:12px;color:var(--faint);flex-shrink:0}
+  .q-chip{
+    display:inline-flex;align-items:center;gap:6px;max-width:100%;
+    border:1.5px solid var(--accent);background:rgba(217,119,87,.06);color:var(--text);
+    border-radius:99px;padding:5px 14px;font-size:13px;font-weight:600;cursor:pointer;text-align:left;
+  }
+  .q-chip.low{border-style:dashed;border-color:var(--border);background:none;color:var(--muted)}
+  .q-chip.low::after{content:'猜的';font-size:10px;color:var(--faint);font-weight:400}
+  .q-chip::before{content:'▾';font-size:10px;color:var(--faint)}
+  .q-radio{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--text);cursor:pointer;white-space:nowrap}
+  .q-radio input{accent-color:var(--accent);margin:0}
+  .q-picker{
+    display:none;margin-top:10px;border:1px solid var(--border);border-radius:10px;
+    max-height:240px;overflow-y:auto;background:var(--card);
+  }
+  .q-picker.open{display:block}
+  .q-picker .q-opt{
+    display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:none;background:none;
+    padding:9px 13px;font-size:13px;color:var(--text);cursor:pointer;
+  }
+  .q-picker .q-opt:hover{background:var(--card-hover)}
+  .q-picker .q-opt.guess{color:var(--accent);font-weight:600}
+  .q-picker .q-opt .q-sub{margin-left:auto;font-size:11px;color:var(--faint);flex-shrink:0}
+  .q-picker .q-empty{padding:14px;text-align:center;font-size:12px;color:var(--faint)}
+  .q-foot{margin-top:14px;font-size:11.5px;color:var(--faint)}
+  .q-fab{
+    position:fixed;right:20px;bottom:24px;z-index:40;width:52px;height:52px;border-radius:50%;
+    border:none;background:var(--accent);color:#fff;font-size:26px;line-height:1;cursor:pointer;
+    box-shadow:0 6px 18px rgba(217,119,87,.45);transition:transform .15s;
+  }
+  .q-fab:hover{transform:scale(1.06)}
+  .q-fab:active{transform:scale(.96)}
+
   /* ---------- Modal / Drawer ---------- */
   .modal{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:20px}
   /* 确认框会叠在历史/动态弹窗之上，需高于普通弹窗层级 */
@@ -449,6 +491,7 @@
       <option value="paused">已暂停</option>
       <option value="done">已完成</option>
     </select>
+    <button class="btn btn-primary" data-action="quick-add" id="btn-quick" title="快速记录 (Ctrl/⌘+K)"></button>
     <button class="btn btn-primary" data-action="add-goal" id="btn-add-goal"></button>
     <button class="btn iconic" data-action="show-snap-compare" id="btn-snap" title="事项动态：按事项查看全部进展时间线"></button>
     <button class="btn iconic" data-action="open-history" id="btn-history" title="历史版本，可一键回滚"></button>
@@ -581,6 +624,28 @@
   </div>
 </div>
 
+<!-- 快速记录（Cmd/Ctrl+K） -->
+<div class="modal" id="quick-modal">
+  <div class="backdrop" data-close="quick-modal"></div>
+  <div class="panel" style="width:min(540px,100%)">
+    <input id="q-input" placeholder="记一笔：要做什么？（自动匹配项目）" maxlength="120" autocomplete="off">
+    <div class="q-row">
+      <span class="q-label" id="q-target-label">挂到项目</span>
+      <button type="button" class="q-chip" id="q-chip" title="点击更换"></button>
+    </div>
+    <div class="q-row">
+      <span class="q-label">类型</span>
+      <label class="q-radio"><input type="radio" name="q-kind" value="issue" checked> 新事项</label>
+      <label class="q-radio"><input type="radio" name="q-kind" value="note"> 进展记录</label>
+    </div>
+    <div class="q-picker" id="q-picker"></div>
+    <div class="q-foot">↵ 保存 · Esc 取消 · 猜测可点击更换，不会自动落库</div>
+  </div>
+</div>
+
+<!-- 移动端快速记录悬浮按钮 -->
+<button type="button" class="q-fab" id="q-fab" title="快速记录">＋</button>
+
 <div id="toast-wrap"></div>
 <input type="file" id="import-file" accept=".json,application/json" hidden>
 
@@ -677,6 +742,7 @@ const ICONS = {
   layers:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
   check:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
   chevDown:'<svg class="bb-chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
+  bolt:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
 };
 
 /* ================= 持久化 ================= */
@@ -1906,6 +1972,7 @@ document.addEventListener('click', e => {
     case 'delete-board': closeBoardMenu(); deleteBoardFlow(id); break;
     case 'show-auth': openAuth('login'); break;
     case 'logout': logoutFlow(); break;
+    case 'quick-add': openQuick(); break;
   }
 });
 
@@ -2050,9 +2117,20 @@ document.addEventListener('keydown', e => {
   if ($('#confirm-modal').classList.contains('open')){ if (confirmCleanup) confirmCleanup(); return; }
   if ($('#input-modal').classList.contains('open')){ if (inputCleanup) inputCleanup(); return; }
   if ($('#auth-modal').classList.contains('open')){ $('#auth-modal').classList.remove('open'); return; }
+  if ($('#quick-modal').classList.contains('open')){ $('#quick-modal').classList.remove('open'); return; }
   if ($('#board-ctl').classList.contains('open')){ closeBoardMenu(); return; }
   collapseExpand();
   ['#project-modal','#goal-modal','#history-modal','#snap-modal'].forEach(sel => $(sel).classList.remove('open'));
+});
+// Cmd/Ctrl+K 快速记录
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')){
+    if (['#confirm-modal','#input-modal','#goal-modal','#project-modal','#auth-modal']
+      .some(s => $(s).classList.contains('open'))) return;
+    e.preventDefault();
+    if ($('#quick-modal').classList.contains('open')) $('#quick-modal').classList.remove('open');
+    else openQuick();
+  }
 });
 
 /* ================= 拖拽换目标 ================= */
@@ -2416,6 +2494,161 @@ function todayStrOf(d){
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
 
+/* ================= 快速记录（Cmd/Ctrl+K） ================= */
+let pickerOpen = false;
+let qKind = 'issue', qKindTouched = false;
+let qManualProject = false, qManualIssue = false;
+let qSelProject = null, qSelIssue = null;
+let qProjects = [], qIssues = [];
+
+function bigrams(s){
+  s = String(s || '').toLowerCase().replace(/\s+/g, '');
+  const out = [];
+  if (s.length === 1) return [s];
+  for (let i = 0; i < s.length - 1; i++) out.push(s.slice(i, i + 2));
+  return out;
+}
+function hitRatio(text, grams){
+  if (!grams.length) return 0;
+  const t = String(text || '').toLowerCase();
+  let hit = 0;
+  grams.forEach(g => { if (t.includes(g)) hit++; });
+  return hit / grams.length;
+}
+/* 字面匹配评分：bigram 重叠 + 全名命中 + 最近活跃加权 */
+function scoreProjects(text){
+  const grams = bigrams(text);
+  return state.projects.map(p => {
+    let s = 0;
+    if (text && p.name && text.toLowerCase().includes(p.name.toLowerCase())) s += 100;
+    if (grams.length) s += 60 * hitRatio(p.name, grams);
+    let issueBoost = 0;
+    state.issues.filter(i => i.projectId === p.id).forEach(i => {
+      issueBoost = Math.max(issueBoost, 30 * hitRatio(i.title, grams));
+    });
+    s += issueBoost;
+    const days = Math.max(0, Math.floor((Date.now() - (p.updatedAt || p.createdAt || 0)) / DAY));
+    s += Math.max(0, 10 - days);
+    return { p, s };
+  }).sort((a,b) => b.s - a.s);
+}
+function scoreIssues(text){
+  const grams = bigrams(text);
+  return state.issues.filter(i => !i.resolved).map(i => {
+    let s = 0;
+    if (text && i.title && text.toLowerCase().includes(i.title.toLowerCase())) s += 100;
+    if (grams.length) s += 60 * hitRatio(i.title, grams);
+    return { i, s };
+  }).sort((a,b) => b.s - a.s);
+}
+function goalNameOf(id){ return (state.goals.find(x => x.id === id) || {}).name || '未分组'; }
+function projNameOf(id){ return (state.projects.find(x => x.id === id) || {}).name || ''; }
+
+function setKind(v){
+  qKind = v;
+  document.querySelectorAll('input[name="q-kind"]').forEach(r => { r.checked = r.value === v; });
+  $('#q-target-label').textContent = v === 'note' ? '挂到事项' : '挂到项目';
+}
+function openQuick(){
+  if (!state.projects.length){ toast('先在沙盘里创建目标与项目，再来快速记录'); return; }
+  qManualProject = qManualIssue = qKindTouched = false;
+  qSelProject = qSelIssue = null;
+  pickerOpen = false;
+  $('#q-input').value = '';
+  setKind('issue');
+  $('#quick-modal').classList.add('open');
+  setTimeout(() => $('#q-input').focus(), 50);
+  recomputeGuess();
+}
+function recomputeGuess(){
+  const text = $('#q-input').value.trim();
+  qProjects = scoreProjects(text);
+  qIssues = scoreIssues(text);
+  /* 类型自动建议：文本与某条未完成事项标题高度重合 → 建议记进展（用户手动选过类型则不干预） */
+  if (!qKindTouched){
+    const want = (qIssues[0] && qIssues[0].s >= 45) ? 'note' : 'issue';
+    if (want !== qKind) setKind(want);
+  }
+  if (qKind === 'issue'){
+    if (!qManualProject && qProjects.length) qSelProject = qProjects[0].p.id;
+  } else {
+    if (!qManualIssue && qIssues.length) qSelIssue = qIssues[0].i.id;
+  }
+  updateChip();
+  if (pickerOpen) renderPicker();
+}
+function updateChip(){
+  const chip = $('#q-chip');
+  if (qKind === 'issue'){
+    const top = qProjects.find(x => x.p.id === qSelProject) || qProjects[0];
+    if (!top){ chip.textContent = '暂无项目'; chip.classList.add('low'); return; }
+    chip.textContent = top.p.name;
+    chip.classList.toggle('low', top.s < 35);
+  } else {
+    const top = qIssues.find(x => x.i.id === qSelIssue) || qIssues[0];
+    if (!top){ chip.textContent = '没有未完成的事项'; chip.classList.add('low'); return; }
+    chip.textContent = top.i.title + ' · ' + projNameOf(top.i.projectId);
+    chip.classList.toggle('low', top.s < 45);
+  }
+}
+function renderPicker(){
+  const el = $('#q-picker');
+  if (!pickerOpen){ el.classList.remove('open'); return; }
+  el.classList.add('open');
+  if (qKind === 'issue'){
+    const list = qProjects.slice(0, 8);
+    el.innerHTML = list.length ? list.map((x, idx) =>
+      '<button type="button" class="q-opt' + (idx === 0 && !qManualProject ? ' guess' : '') + '" data-qpid="' + x.p.id + '">' +
+      esc(x.p.name) + '<span class="q-sub">' + esc(goalNameOf(x.p.goalId)) +
+      (x.s >= 35 ? ' · 高匹配' : (idx === 0 ? ' · 最近活跃' : '')) + '</span></button>').join('')
+      : '<div class="q-empty">还没有项目，先去沙盘创建</div>';
+  } else {
+    const list = qIssues.slice(0, 8);
+    el.innerHTML = list.length ? list.map((x, idx) =>
+      '<button type="button" class="q-opt' + (idx === 0 && !qManualIssue ? ' guess' : '') + '" data-qiid="' + x.i.id + '">' +
+      esc(x.i.title) + '<span class="q-sub">' + esc(projNameOf(x.i.projectId)) + ' · 未完成</span></button>').join('')
+      : '<div class="q-empty">没有未完成的事项，可切换为「新事项」</div>';
+  }
+}
+function submitQuick(){
+  const text = $('#q-input').value.trim();
+  if (!text){ toast('先写一句话', 'err'); return; }
+  const now = Date.now();
+  if (qKind === 'issue'){
+    const p = state.projects.find(x => x.id === qSelProject);
+    if (!p){ toast('选择一个项目', 'err'); return; }
+    state.issues.push({ id:uid(), projectId:p.id, title:text, severity:'medium', resolved:false, resolvedAt:null, createdAt:now, notes:[] });
+    p.updatedAt = now;
+    save(); renderAll();
+    $('#quick-modal').classList.remove('open');
+    toast('已添加到「' + p.name + '」');
+  } else {
+    const i = state.issues.find(x => x.id === qSelIssue);
+    if (!i){ toast('选择一条事项', 'err'); return; }
+    if (!Array.isArray(i.notes)) i.notes = [];
+    i.notes.push({ ts:now, text });
+    const p = state.projects.find(x => x.id === i.projectId);
+    if (p) p.updatedAt = now;
+    save(); renderAll();
+    $('#quick-modal').classList.remove('open');
+    toast('进展已记录到「' + i.title + '」');
+  }
+}
+$('#q-input').addEventListener('input', recomputeGuess);
+$('#q-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.isComposing){ e.preventDefault(); submitQuick(); }
+});
+$('#q-chip').addEventListener('click', () => { pickerOpen = !pickerOpen; renderPicker(); });
+$('#q-picker').addEventListener('click', e => {
+  const proj = e.target.closest('[data-qpid]');
+  if (proj){ qSelProject = proj.dataset.qpid; qManualProject = true; pickerOpen = false; renderPicker(); updateChip(); return; }
+  const iss = e.target.closest('[data-qiid]');
+  if (iss){ qSelIssue = iss.dataset.qiid; qManualIssue = true; pickerOpen = false; renderPicker(); updateChip(); }
+});
+document.querySelectorAll('input[name="q-kind"]').forEach(r =>
+  r.addEventListener('change', () => { qKindTouched = true; qKind = r.value; setKind(qKind); recomputeGuess(); }));
+$('#q-fab').addEventListener('click', openQuick);
+
 /* ================= 初始化 ================= */
 async function bootLoad(){
   serverMode = await detectServer();
@@ -2435,6 +2668,7 @@ async function bootLoad(){
 (function init(){
   $('#logo').innerHTML = ICONS.target + '<span>项目沙盘</span>';
   $('#btn-add-goal').innerHTML = ICONS.plus + ' 新建目标';
+  $('#btn-quick').innerHTML = ICONS.bolt + ' 快速记录';
   $('#btn-history').innerHTML = ICONS.clock + ' 历史';
   $('#btn-snap').innerHTML = ICONS.trend;
   $('#btn-history').innerHTML = ICONS.clock;
