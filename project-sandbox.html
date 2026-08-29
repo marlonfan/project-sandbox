@@ -42,6 +42,9 @@
     border:1px solid var(--border);border-radius:99px;padding:4px 12px;font-size:12.5px;color:var(--muted);white-space:nowrap;
   }
   .stat b{color:var(--text);font-variant-numeric:tabular-nums;font-size:14px}
+  .stats .stat{cursor:pointer}
+  .stat.on{border-color:var(--accent);color:var(--text)}
+  .stat.on b{color:var(--accent)}
   .stat.warn b{color:var(--amber)} .stat.bad b{color:var(--red)}
   .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
   /* 顶栏两行布局：第一行 logo + 统计 + 用户区，第二行工具栏独占一行 */
@@ -241,6 +244,9 @@
   .a-err{color:#b91c1c;font-size:12px;min-height:16px;margin:2px 0 8px}
   .a-hint{font-size:11.5px;color:var(--faint);margin-top:4px}
   .user-email{font-size:12.5px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #save-indicator{font-size:11.5px;color:var(--faint);white-space:nowrap}
+  #save-indicator.save-ok{color:var(--green)}
+  #save-indicator.save-err{color:var(--red);cursor:pointer}
 
   /* ---------- 本周视图 ---------- */
   .view-switch{display:flex;gap:4px;background:rgba(31,30,29,.05);padding:3px;border-radius:9px}
@@ -416,6 +422,7 @@
 <header>
   <div class="logo" id="logo"></div>
   <div class="stats" id="stats"></div>
+  <span id="save-indicator"></span>
   <div id="user-ctl" style="display:none;align-items:center;gap:4px"></div>
   <div class="toolbar">
     <div class="view-switch" id="view-switch">
@@ -609,6 +616,7 @@ const SEVERITY = { high:'高', medium:'中', low:'低' };
 let state = null;
 let searchQ = '';
 let statusFilter = 'all';
+let pillFilter = '';   // 统计胶囊筛选：'' | 'active' | 'risky' | 'due' | 'open'
 let expandedProjectId = null;
 let openNotesIssueId = null;
 let collapsedGoals = new Set();
@@ -674,28 +682,48 @@ const ICONS = {
 /* ================= 持久化 ================= */
 const api = p => API_BASE + p;
 let saveTimer = null;
+function setSaveState(st){
+  const el = $('#save-indicator');
+  if (!el) return;
+  el.classList.remove('save-ok','save-err');
+  if (st === 'saving'){ el.textContent = '保存中…'; }
+  else if (st === 'ok'){ el.textContent = '已保存 ' + fmtHist(Date.now()); el.classList.add('save-ok'); }
+  else { el.textContent = '保存失败，点击重试'; el.classList.add('save-err'); }
+}
 function save(){
   clearTimeout(saveTimer);
+  setSaveState('saving');
   saveTimer = setTimeout(flushSave, serverMode ? 500 : 150);
 }
 function flushSave(){
   clearTimeout(saveTimer);
+  saveTimer = null;
   if (serverMode){
     if (!currentBoardId) return;
     const bid = currentBoardId;
     const body = JSON.stringify({ state });
     apiFetch('/api/boards/' + bid + '/state', { method:'PUT', headers:{'Content-Type':'application/json'}, body })
-      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); scheduleBackupWrite(); })
-      .catch(e => { if (e && e.message !== 'unauthorized') toast('保存到服务端失败，请检查服务是否在运行', 'err'); });
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); setSaveState('ok'); scheduleBackupWrite(); })
+      .catch(e => {
+        if (e && e.message === 'unauthorized') return;
+        setSaveState('err');
+        toast('保存到服务端失败，请检查服务是否在运行', 'err');
+      });
     return;
   }
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     pushHistory();
+    setSaveState('ok');
     scheduleBackupWrite();
   }
-  catch(e){ toast('保存失败：本地存储不可用', 'err'); }
+  catch(e){ setSaveState('err'); toast('保存失败：本地存储不可用', 'err'); }
 }
+/* 兜底：页面隐藏/关闭前，把还在防抖里的改动立即发出去 */
+function flushIfPending(){ if (saveTimer) flushSave(); }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushIfPending(); });
+window.addEventListener('pagehide', flushIfPending);
+window.addEventListener('beforeunload', flushIfPending);
 
 function loadHistory(){
   try { const h = JSON.parse(localStorage.getItem(HISTORY_KEY)); return Array.isArray(h) ? h : []; }
@@ -851,6 +879,7 @@ async function switchBoard(id){
   try { localStorage.setItem(CURRENT_BOARD_KEY, id); } catch(e){}
   searchQ = ''; $('#search').value = '';
   statusFilter = 'all'; $('#status-filter').value = 'all';
+  pillFilter = '';
   await fetchBoardState();
   renderBoardSwitcher();
   renderAll();
@@ -1053,6 +1082,10 @@ function setStatus(p, to){
 
 /* ================= 渲染 ================= */
 function matchesFilter(p){
+  if (pillFilter === 'active' && p.status !== 'on-track') return false;
+  if (pillFilter === 'risky' && !(p.status === 'at-risk' || p.status === 'blocked')) return false;
+  if (pillFilter === 'due' && !isDueSoon(p)) return false;
+  if (pillFilter === 'open' && unresolvedIssues(p.id).length === 0) return false;
   if (statusFilter !== 'all' && p.status !== statusFilter) return false;
   if (searchQ){
     const q = searchQ.toLowerCase();
@@ -1060,17 +1093,27 @@ function matchesFilter(p){
   }
   return true;
 }
+function isDueSoon(p){
+  if (!p.deadline || p.status === 'done' || p.status === 'paused') return false;
+  return p.deadline <= relDay(7);
+}
 
 function renderStats(){
   const total = state.projects.length;
   const active = state.projects.filter(p => p.status === 'on-track').length;
   const risky  = state.projects.filter(p => p.status === 'at-risk' || p.status === 'blocked').length;
+  const due    = state.projects.filter(isDueSoon).length;
   const openIssues = state.projects.reduce((s,p) => s + unresolvedIssues(p.id).length, 0);
+  const pill = (key, cls, dotColor, label, n) =>
+    '<span class="stat' + (cls ? ' ' + cls : '') + (pillFilter === key ? ' on' : '') + '" data-pill="' + key + '" title="点击筛选 / 再点取消">' +
+    (dotColor ? '<span class="dot" style="background:' + dotColor + '"></span>' : '') +
+    label + ' <b>' + n + '</b></span>';
   $('#stats').innerHTML =
-    '<span class="stat">总项目 <b>' + total + '</b></span>' +
-    '<span class="stat"><span class="dot" style="background:var(--green)"></span>进行中 <b>' + active + '</b></span>' +
-    '<span class="stat warn"><span class="dot" style="background:var(--amber)"></span>风险中 <b>' + risky + '</b></span>' +
-    '<span class="stat bad"><span class="dot" style="background:var(--red)"></span>未完成事项 <b>' + openIssues + '</b></span>';
+    pill('', '', '', '总项目', total) +
+    pill('active', '', 'var(--green)', '进行中', active) +
+    pill('risky', 'warn', 'var(--amber)', '风险中', risky) +
+    pill('due', '', due ? 'var(--red)' : 'var(--faint)', '即将到期', due) +
+    pill('open', 'bad', 'var(--red)', '未完成事项', openIssues);
 }
 
 function pblockHTML(p){
@@ -1166,7 +1209,7 @@ function notesPanelHTML(issue){
 }
 
 function zoneHTML(goal){
-  const filtering = searchQ !== '' || statusFilter !== 'all';
+  const filtering = searchQ !== '' || statusFilter !== 'all' || pillFilter !== '';
   const projects = state.projects
     .filter(p => p.goalId === goal.id)
     .sort((a,b) => ((Number(a.order)||0) - (Number(b.order)||0)))
@@ -1214,7 +1257,7 @@ function renderBoard(){
     expandedProjectId = null;
   }
   const html = state.goals.map(zoneHTML).join('');
-  const filtering = searchQ !== '' || statusFilter !== 'all';
+  const filtering = searchQ !== '' || statusFilter !== 'all' || pillFilter !== '';
   board.innerHTML = html || (filtering
     ? '<div class="empty-state"><h2>没有匹配的项目</h2><p>换个关键词或筛选条件试试。</p></div>'
     : '');
@@ -1984,6 +2027,16 @@ document.addEventListener('change', e => {
   if (['d-goal','d-status','d-deadline'].includes(e.target.id)) applyDrawerEdits();
 });
 $('#search').addEventListener('input', e => { searchQ = e.target.value.trim(); renderBoard(); });
+$('#stats').addEventListener('click', e => {
+  const el = e.target.closest('.stat');
+  if (!el) return;
+  const key = el.dataset.pill || '';
+  pillFilter = pillFilter === key ? '' : key;
+  renderBoard(); renderStats();
+});
+$('#save-indicator').addEventListener('click', () => {
+  if ($('#save-indicator').classList.contains('save-err')) flushSave();
+});
 $('#status-filter').addEventListener('change', e => { statusFilter = e.target.value; renderBoard(); });
 // 导入文件
 $('#import-file').addEventListener('change', e => {
