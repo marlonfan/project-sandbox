@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>项目沙盘 · 本周视图（概念预览）</title>
+<style>
+  :root{
+    --bg:#faf9f5; --panel:#f3f1ea; --card:#ffffff; --card-hover:#f7f5ef;
+    --border:#ece9e0; --text:#1f1e1d; --muted:#6b6862; --faint:#b5b1a7;
+    --accent:#d97757; --green:#16a34a; --amber:#d97706; --red:#dc2626; --blue:#2563eb;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--bg);color:var(--text);min-height:100vh;
+    font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+    font-size:14px;line-height:1.6;
+  }
+  header{
+    position:sticky;top:0;z-index:20;background:rgba(250,249,245,.92);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--border);padding:14px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  }
+  .logo{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700;letter-spacing:.5px;white-space:nowrap;font-family:Georgia,'Times New Roman','Songti SC',SimSun,serif}
+  .logo svg{color:var(--accent)}
+  .week-range{font-size:12.5px;color:var(--muted)}
+  .week-switch{margin-left:auto;display:flex;gap:4px;background:rgba(31,30,29,.05);padding:3px;border-radius:9px}
+  .week-switch button{border:none;background:none;padding:5px 14px;border-radius:7px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer}
+  .week-switch button.on{background:var(--card);color:var(--text);box-shadow:0 1px 2px rgba(31,30,29,.08)}
+  main{max-width:780px;margin:0 auto;padding:22px 18px 90px}
+  .preview-note{
+    display:flex;gap:8px;align-items:flex-start;background:var(--panel);border:1px dashed var(--border);
+    border-radius:10px;padding:10px 14px;font-size:12px;color:var(--muted);margin-bottom:20px;line-height:1.7;
+  }
+  .preview-note b{color:var(--accent)}
+
+  h2.sec{font-size:13px;font-weight:700;letter-spacing:1px;color:var(--muted);margin:28px 0 10px;display:flex;align-items:center;gap:8px}
+  h2.sec:first-of-type{margin-top:0}
+  .sec-range{display:none;margin-left:auto;font-weight:400;font-size:11px;color:var(--faint);letter-spacing:0}
+
+  /* 速览 */
+  .stats{display:flex;gap:8px;flex-wrap:wrap}
+  .stat{
+    display:flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--border);
+    border-radius:99px;padding:6px 14px;font-size:12.5px;color:var(--muted);white-space:nowrap;cursor:pointer;transition:all .15s;
+  }
+  .stat b{color:var(--text);font-size:14px;font-variant-numeric:tabular-nums}
+  .stat:hover{background:var(--card-hover)}
+  .stat.on{border-color:var(--accent);color:var(--text)}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0}
+  .summary{
+    margin-top:12px;background:var(--card);border:1px solid var(--border);border-radius:12px;
+    padding:14px 18px;font-size:13.5px;line-height:1.9;color:var(--muted);
+  }
+  .summary b{color:var(--text)}
+
+  /* 需要关注 */
+  .risk-card{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1px solid var(--border);border-left:3px solid var(--red);border-radius:10px;padding:12px 16px;margin-bottom:8px}
+  .risk-card.amber{border-left-color:var(--amber)}
+  .risk-card .r-icon{font-size:15px;line-height:1.5}
+  .risk-card .r-body{flex:1;min-width:0}
+  .risk-card .r-title{font-weight:600;font-size:13.5px}
+  .risk-card .r-desc{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.7}
+  .risk-card .r-tag{font-size:11px;font-weight:700;color:var(--red);background:rgba(220,38,38,.08);border-radius:99px;padding:2px 9px;white-space:nowrap;flex-shrink:0}
+  .risk-card.amber .r-tag{color:var(--amber);background:rgba(217,119,6,.08)}
+
+  /* 变化时间线 */
+  .day-divider{display:flex;align-items:center;gap:10px;margin:22px 0 10px;font-size:12px;color:var(--faint);font-weight:600}
+  .day-divider::after{content:'';flex:1;height:1px;background:var(--border)}
+  .goal-group{margin-bottom:14px}
+  .goal-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12.5px;color:var(--muted)}
+  .goal-head .gname{font-weight:700;color:var(--text);font-size:13px}
+  .change{
+    display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1px solid var(--border);
+    border-radius:10px;padding:11px 14px;margin-bottom:6px;
+  }
+  .change .c-icon{
+    width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:700;flex-shrink:0;margin-top:1px;
+  }
+  .c-icon.done{background:rgba(22,163,74,.1);color:var(--green)}
+  .c-icon.progress{background:rgba(217,119,87,.12);color:var(--accent)}
+  .c-icon.add{background:rgba(37,99,235,.1);color:var(--blue)}
+  .c-icon.status{background:rgba(217,119,6,.1);color:var(--amber)}
+  .change .c-body{flex:1;min-width:0}
+  .change .c-project{font-size:11.5px;color:var(--faint);margin-bottom:1px}
+  .change .c-text{font-size:13.5px;line-height:1.65;word-break:break-all}
+  .change .c-text .issue{font-weight:600}
+  .change .c-time{font-size:11.5px;color:var(--faint);white-space:nowrap;flex-shrink:0;margin-top:2px;font-variant-numeric:tabular-nums}
+  .empty-tip{color:var(--faint);font-size:12.5px;text-align:center;padding:26px 0}
+
+  /* 无动静 */
+  .quiet-card{display:flex;gap:10px;align-items:center;background:var(--card);border:1px dashed var(--border);border-radius:10px;padding:12px 16px;margin-bottom:8px}
+  .quiet-card .q-name{font-weight:600;font-size:13.5px}
+  .quiet-card .q-goal{font-size:11.5px;color:var(--faint)}
+  .quiet-card .q-days{margin-left:auto;font-size:11.5px;color:var(--amber);white-space:nowrap}
+
+  /* 周报 */
+  .report-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  .report-head{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border)}
+  .report-head span{font-size:12px;color:var(--muted)}
+  .report-head button{
+    border:none;background:var(--accent);color:#fff;font-size:12px;font-weight:600;
+    border-radius:8px;padding:6px 14px;cursor:pointer;
+  }
+  .report-head button:hover{background:#c9663f}
+  .report-body{padding:16px 18px;font-family:'SF Mono',Menlo,Consolas,'Courier New',monospace;font-size:12px;line-height:1.9;color:var(--muted);white-space:pre-wrap;overflow-wrap:break-word}
+
+  /* toast */
+  #toast-wrap{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:100;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+  .toast{background:#1f1e1d;color:#fff;font-size:13px;padding:9px 18px;border-radius:99px;box-shadow:0 4px 14px rgba(31,30,29,.25);opacity:0;transform:translateY(8px);transition:all .25s}
+  .toast.show{opacity:1;transform:none}
+
+  @media (max-width:640px){
+    header{padding:12px 14px}
+    main{padding:16px 12px 70px}
+    .change .c-time{display:none}
+    .report-body{font-size:11.5px;line-height:1.85}
+    .sec-range{display:inline}
+  }
+  @media (max-width:480px){
+    .week-range{display:none} /* 日期范围移到「本周速览」标题行，头部保持单行 */
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+    项目沙盘
+  </div>
+  <span class="week-range" id="week-range"></span>
+  <div class="week-switch">
+    <button id="btn-this" class="on">本周</button>
+    <button id="btn-last">上周</button>
+  </div>
+</header>
+
+<main>
+  <div class="preview-note">
+    <span>🛠</span>
+    <span><b>概念预览</b>：这是对「以变化为中心的周回顾」形态的静态演示，数据为 Mock。想验证的问题——每周打开沙盘时，先看到"这周发生了什么、什么卡住了、什么该放手"，而不是一张要逐行翻看的全量列表。</span>
+  </div>
+
+  <h2 class="sec">本周速览<span class="sec-range" id="sec-range"></span></h2>
+  <div class="stats" id="stats"></div>
+  <div class="summary" id="summary"></div>
+
+  <h2 class="sec">需要关注</h2>
+  <div id="risks"></div>
+
+  <h2 class="sec">本周变化</h2>
+  <div class="stats" id="type-filter" style="margin-bottom:12px"></div>
+  <div id="timeline"></div>
+
+  <h2 class="sec">本周没有动静</h2>
+  <div id="quiet"></div>
+
+  <h2 class="sec">周报</h2>
+  <div class="report-card">
+    <div class="report-head">
+      <span>已按本周变化自动生成，可直接粘贴</span>
+      <button id="btn-copy">复制周报</button>
+    </div>
+    <div class="report-body" id="report"></div>
+  </div>
+</main>
+
+<div id="toast-wrap"></div>
+
+<script>
+'use strict';
+/* ================= Mock 数据 ================= */
+const GOALS = {
+  growth: { name:'提升用户增长', color:'#2563eb' },
+  biz:    { name:'商业化变现',   color:'#ea580c' },
+  tech:   { name:'技术架构升级', color:'#7c3aed' },
+};
+
+const WEEKS = {
+  this: {
+    label:'本周', range:'8月24日 – 8月30日',
+    changes: [
+      { d:0, time:'10:24', type:'progress', goal:'tech', project:'微服务拆分改造', issue:'用户域拆分方案',   text:'用户域拆分方案评审通过，Q3 内完成骨架搭建' },
+      { d:0, time:'09:12', type:'done',     goal:'biz',  project:'会员订阅体系上线', issue:'会员定价方案',     text:'定价终稿过会，年卡 328 档确定' },
+      { d:1, time:'16:40', type:'status',   goal:'growth', project:'老用户召回活动', issue:null,
+        text:'状态从「有风险」转为「受阻」：短信通道供应商报价超预算 40%，预算审批被退回' },
+      { d:1, time:'11:05', type:'add',      goal:'tech', project:'微服务拆分改造', issue:'压测环境重建脚本', text:'优先级 中，先于 Q3 骨架搭建' },
+      { d:2, time:'15:18', type:'progress', goal:'growth', project:'新用户引导流程改版', issue:'引导页 A/B 实验', text:'第二组实验开启，首屏文案 B 版次日留存 +2.1%' },
+      { d:2, time:'14:02', type:'progress', goal:'biz',  project:'会员订阅体系上线', issue:'支付通道资质审核', text:'资质材料重新递交，进入初审队列' },
+      { d:3, time:'20:47', type:'done',     goal:'tech', project:'微服务拆分改造', issue:'订单域拆分',       text:'订单域拆分上线，灰度 10% 流量平稳' },
+      { d:3, time:'09:30', type:'add',      goal:'growth', project:'SEO 内容矩阵建设', issue:'行业长尾词库整理', text:'优先级 高，作为签约作者的第一篇选题' },
+      { d:4, time:'10:02', type:'status',   goal:'growth', project:'SEO 内容矩阵建设', issue:null,
+        text:'状态从「已暂停」转为「进行中」：重启内容矩阵，签约 2 名外部作者' },
+      { d:4, time:'09:45', type:'progress', goal:'tech', project:'微服务拆分改造', issue:'服务间调用延迟抖动', text:'链路追踪定位到序列化热点，已提优化 PR' },
+    ],
+    risks: [
+      { level:'red',   tag:'受阻',   title:'老用户召回活动',   short:'短信通道报价超预算，建议本周定夺', desc:'提升用户增长 · 短信通道供应商报价超预算 40%，预算审批退回。召回窗口每周都在流逝，建议本周内定夺：换供应商或砍预算。' },
+      { level:'amber', tag:'逾期 2 天', title:'支付通道资质审核', short:'材料已重新递交，主动同步法务催办', desc:'商业化变现 / 会员订阅体系上线 · 原定 8月26日 完成。材料已重新递交，建议主动同步法务催办。' },
+    ],
+    quiet: [
+      { name:'监控告警体系完善', goal:'技术架构升级', days:12 },
+      { name:'广告位收益优化',   goal:'商业化变现',   days:9  },
+    ],
+    summaryParts:{ activeGoals:3, totalGoals:3, mostActive:'会员订阅体系上线', mostActiveCount:4, quiet:'监控告警体系完善已 12 天没有动静' },
+  },
+  last: {
+    label:'上周', range:'8月17日 – 8月23日',
+    changes: [
+      { d:1, time:'18:22', type:'done',     goal:'tech', project:'核心链路性能优化', issue:'压测环境数据构造脚本', text:'修复脚本报错，全链路压测完成，P99 210ms 达标' },
+      { d:1, time:'18:20', type:'status',   goal:'tech', project:'核心链路性能优化', issue:null,
+        text:'状态从「进行中」转为「已完成」：下单链路优化目标全部达成' },
+      { d:3, time:'15:36', type:'progress', goal:'growth', project:'新用户引导流程改版', issue:'引导页 A/B 实验', text:'第一组实验结束，数据回收中' },
+      { d:4, time:'11:12', type:'add',      goal:'biz',  project:'会员订阅体系上线', issue:'权益中心接口联调', text:'新增事项：优先级「高」' },
+      { d:5, time:'10:08', type:'progress', goal:'tech', project:'微服务拆分改造', issue:'订单域拆分', text:'拆分骨架完成，进入联调' },
+    ],
+    risks: [
+      { level:'amber', tag:'临近截止', title:'引导页 A/B 实验', short:'数据回收顺延，尽快出结论', desc:'提升用户增长 / 新用户引导流程改版 · 原定 8月21日 出结论，数据回收顺延中。' },
+    ],
+    quiet: [
+      { name:'监控告警体系完善', goal:'技术架构升级', days:5 },
+      { name:'SEO 内容矩阵建设', goal:'提升用户增长', days:21 },
+    ],
+    summaryParts:{ activeGoals:3, totalGoals:3, mostActive:'核心链路性能优化', mostActiveCount:2, quiet:'SEO 内容矩阵建设当时已停摆 3 周' },
+  },
+};
+
+const TYPE_META = {
+  done:    { label:'完成',   icon:'✓', color:'var(--green)' },
+  progress:{ label:'进展',   icon:'●', color:'var(--accent)' },
+  add:     { label:'新增',   icon:'＋', color:'var(--blue)' },
+  status:  { label:'状态',   icon:'↻', color:'var(--amber)' },
+};
+const DAY_NAMES = ['今天 · 周五','昨天 · 周四','周三 8月26日','周二 8月25日','周一 8月24日'];
+
+let curWeek = 'this';
+let curType = 'all';
+
+/* ================= 渲染 ================= */
+const $ = s => document.querySelector(s);
+
+function render(){
+  const w = WEEKS[curWeek];
+  $('#week-range').textContent = w.range;
+  $('#sec-range').textContent = w.range;
+
+  /* 速览 */
+  const counts = { done:0, add:0, progress:0, status:0 };
+  w.changes.forEach(c => counts[c.type]++);
+  $('#stats').innerHTML =
+    statPill('all', '全部变化', w.changes.length, 'var(--text)') +
+    statPill('done', '完成', counts.done, 'var(--green)') +
+    statPill('progress', '进展', counts.progress, 'var(--accent)') +
+    statPill('add', '新增', counts.add, 'var(--blue)') +
+    statPill('status', '状态变化', counts.status, 'var(--amber)');
+
+  const s = w.summaryParts;
+  $('#summary').innerHTML =
+    `${s.activeGoals} 个目标全部有推进；<b>${s.mostActive}</b> 最活跃（${s.mostActiveCount} 条变化）。` +
+    `值得警惕的是：<b>${s.quiet}</b>。`;
+
+  /* 需要关注 */
+  $('#risks').innerHTML = w.risks.map(r =>
+    `<div class="risk-card ${r.level === 'amber' ? 'amber' : ''}">
+      <span class="r-icon">${r.level === 'red' ? '🔥' : '⏳'}</span>
+      <div class="r-body">
+        <div class="r-title">${r.title}</div>
+        <div class="r-desc">${r.desc}</div>
+      </div>
+      <span class="r-tag">${r.tag}</span>
+    </div>`).join('');
+
+  /* 时间线 */
+  let html = '';
+  const days = [...new Set(w.changes.map(c => c.d))].sort((a,b) => a - b);
+  let shown = 0;
+  days.forEach(d => {
+    const items = w.changes.filter(c => c.d === d && (curType === 'all' || c.type === curType));
+    if (!items.length) return;
+    html += `<div class="day-divider">${DAY_NAMES[d] || '更早'}</div>`;
+    ['growth','biz','tech'].forEach(g => {
+      const gItems = items.filter(c => c.goal === g);
+      if (!gItems.length) return;
+      html += `<div class="goal-group">
+        <div class="goal-head"><span class="dot" style="background:${GOALS[g].color}"></span><span class="gname">${GOALS[g].name}</span></div>
+        ${gItems.map(c => {
+          const m = TYPE_META[c.type];
+          return `<div class="change">
+            <span class="c-icon ${c.type}">${m.icon}</span>
+            <div class="c-body">
+              <div class="c-project">${c.project}</div>
+              <div class="c-text">${c.issue ? '<span class="issue">' + c.issue + '</span>：' : ''}${c.text}</div>
+            </div>
+            <span class="c-time">${c.time}</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+    });
+    shown += items.length;
+  });
+  $('#timeline').innerHTML = html || '<div class="empty-tip">该类型下本周没有变化</div>';
+
+  /* 无动静 */
+  $('#quiet').innerHTML = w.quiet.map(q =>
+    `<div class="quiet-card">
+      <span>💤</span>
+      <div><div class="q-name">${q.name}</div><div class="q-goal">${q.goal}</div></div>
+      <span class="q-days">${q.days} 天没有更新</span>
+    </div>`).join('');
+
+  /* 周报 */
+  $('#report').textContent = buildReport(w);
+
+  /* 类型筛选按钮状态 */
+  document.querySelectorAll('#type-filter .stat').forEach(el =>
+    el.classList.toggle('on', el.dataset.type === curType));
+  $('#btn-this').classList.toggle('on', curWeek === 'this');
+  $('#btn-last').classList.toggle('on', curWeek === 'last');
+}
+
+function statPill(type, label, n, color){
+  return `<span class="stat${type === curType ? ' on' : ''}" data-type="${type}">
+    ${type !== 'all' ? `<span class="dot" style="background:${color}"></span>` : ''}${label} <b>${n}</b></span>`;
+}
+
+function buildReport(w){
+  const lines = [`📌 项目周报（${w.range.replace(' – ', ' – ')}）`, ''];
+  ['growth','biz','tech'].forEach(g => {
+    const items = w.changes.filter(c => c.goal === g);
+    if (!items.length) return;
+    lines.push(`【${GOALS[g].name}】`);
+    items.forEach(c => {
+      const prefix = c.type === 'done' ? '✅ ' : c.type === 'add' ? '➕ ' : c.type === 'status' ? '🔁 ' : '· ';
+      lines.push(prefix + (c.issue ? c.issue + '：' : '') + c.text);
+    });
+    lines.push('');
+  });
+  if (w.risks.length){
+    lines.push('⚠️ 需要关注');
+    w.risks.forEach(r => lines.push(r.tag + '：' + r.title + ' — ' + r.short));
+    lines.push('');
+  }
+  if (w.quiet.length){
+    lines.push('💤 无动静：' + w.quiet.map(q => `${q.name}（${q.days} 天）`).join('、'));
+  }
+  return lines.join('\n').trim();
+}
+
+function toast(msg){
+  const el = document.createElement('div');
+  el.className = 'toast show';
+  el.textContent = msg;
+  $('#toast-wrap').appendChild(el);
+  setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 2000);
+}
+
+/* ================= 事件 ================= */
+document.addEventListener('click', e => {
+  const stat = e.target.closest('#type-filter .stat, #stats .stat');
+  if (stat){ curType = stat.dataset.type; render(); return; }
+  if (e.target.id === 'btn-this'){ curWeek = 'this'; curType = 'all'; render(); return; }
+  if (e.target.id === 'btn-last'){ curWeek = 'last'; curType = 'all'; render(); return; }
+  if (e.target.id === 'btn-copy'){
+    const text = $('#report').textContent;
+    (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
+      .then(() => toast('周报已复制，直接去粘贴吧'))
+      .catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); ta.remove();
+        toast('周报已复制');
+      });
+  }
+});
+
+render();
+</script>
+</body>
+</html>
