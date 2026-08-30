@@ -289,6 +289,8 @@
   #save-indicator{font-size:11.5px;color:var(--faint);white-space:nowrap}
   #save-indicator.save-ok{color:var(--green)}
   #save-indicator.save-err{color:var(--red);cursor:pointer}
+  #local-banner{background:#fdf3e7;border-bottom:1px solid #f0dfc8;color:#92600a;font-size:12px;padding:8px 22px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  #local-banner button{border:1px solid #e2c893;background:#fff;color:#92600a;font-size:11.5px;font-weight:600;border-radius:7px;padding:3px 10px;cursor:pointer}
 
   /* ---------- 本周视图 ---------- */
   .view-switch{display:flex;gap:4px;background:rgba(31,30,29,.05);padding:3px;border-radius:9px}
@@ -500,6 +502,11 @@
     <button class="btn iconic" data-action="toggle-backup" id="btn-backup"></button>
   </div>
 </header>
+
+<div id="local-banner" style="display:none">
+  <span>⚠ 本地模式：未连接到服务端，数据仅保存在这台设备的浏览器里，不会同步。可随时「导出 JSON」迁移。</span>
+  <button type="button" id="lb-retry">重试连接</button>
+</div>
 
 <main>
   <div id="board"></div>
@@ -761,32 +768,34 @@ function save(){
   setSaveState('saving');
   saveTimer = setTimeout(flushSave, serverMode ? 500 : 150);
 }
-function flushSave(){
+function flushSave(keepalive){
   clearTimeout(saveTimer);
   saveTimer = null;
   if (serverMode){
     if (!currentBoardId) return;
     const bid = currentBoardId;
     const body = JSON.stringify({ state });
-    apiFetch('/api/boards/' + bid + '/state', { method:'PUT', headers:{'Content-Type':'application/json'}, body })
+    apiFetch('/api/boards/' + bid + '/state', { method:'PUT', headers:{'Content-Type':'application/json'}, body, keepalive: !!keepalive })
       .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); setSaveState('ok'); scheduleBackupWrite(); })
       .catch(e => {
         if (e && e.message === 'unauthorized') return;
         setSaveState('err');
         toast('保存到服务端失败，请检查服务是否在运行', 'err');
+        if (!saveTimer) saveTimer = setTimeout(flushSave, 5000); // 自动重试，直到成功
       });
     return;
   }
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    try { localStorage.setItem('psb-local-ts', String(Date.now())); } catch(e){}
     pushHistory();
     setSaveState('ok');
     scheduleBackupWrite();
   }
   catch(e){ setSaveState('err'); toast('保存失败：本地存储不可用', 'err'); }
 }
-/* 兜底：页面隐藏/关闭前，把还在防抖里的改动立即发出去 */
-function flushIfPending(){ if (saveTimer) flushSave(); }
+/* 兜底：页面隐藏/关闭前，把还在防抖里的改动立即发出去（keepalive 让请求活得比页面久） */
+function flushIfPending(){ if (saveTimer) flushSave(true); }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushIfPending(); });
 window.addEventListener('pagehide', flushIfPending);
 window.addEventListener('beforeunload', flushIfPending);
@@ -924,6 +933,7 @@ async function loadFromServer(){
   currentBoardId = boardsList.some(b => b.id === savedId) ? savedId : boardsList[0].id;
   await fetchBoardState();
   renderBoardSwitcher();
+  await checkLocalRescue();
 }
 async function fetchBoardState(){
   let data = null;
@@ -2650,6 +2660,40 @@ document.querySelectorAll('input[name="q-kind"]').forEach(r =>
 $('#q-fab').addEventListener('click', openQuick);
 
 /* ================= 初始化 ================= */
+function showLocalBanner(){
+  const el = $('#local-banner');
+  if (el) el.style.display = 'flex';
+  $('#lb-retry').addEventListener('click', () => location.reload());
+}
+/* 服务端模式启动时：若本地留有比服务器新的未同步修改（曾在本地模式编辑），提示救援 */
+async function checkLocalRescue(){
+  let raw = null, ts = 0;
+  try {
+    raw = localStorage.getItem(STORAGE_KEY);
+    ts = Number(localStorage.getItem('psb-local-ts')) || 0;
+  } catch(e){}
+  if (!raw || !ts) return;
+  const b = boardsList.find(x => x.id === currentBoardId);
+  if (!b || ts <= b.updatedAt){ try { localStorage.removeItem('psb-local-ts'); } catch(e){} return; }
+  let parsed = null;
+  try { parsed = JSON.parse(raw); } catch(e){}
+  if (!parsed || !Array.isArray(parsed.goals) || !Array.isArray(parsed.projects)){
+    try { localStorage.removeItem('psb-local-ts'); } catch(e){}
+    return;
+  }
+  const ok = await confirmDialog({
+    title: '发现未同步的本地修改',
+    message: fmtHist(ts) + ' 你在本地模式下编辑过数据（当时未连接服务端），可能比服务器上的「' + b.name + '」更新。要用本地数据覆盖服务器吗？覆盖后服务器当前状态仍可在「历史版本」里找回。',
+  });
+  if (ok){
+    state = normalize(parsed);
+    save(); renderAll();
+    toast('已用本地数据覆盖「' + b.name + '」');
+  } else {
+    toast('已忽略本地副本，服务器数据未变');
+  }
+  try { localStorage.removeItem('psb-local-ts'); } catch(e){}
+}
 async function bootLoad(){
   serverMode = await detectServer();
   if (serverMode){
@@ -2663,6 +2707,7 @@ async function bootLoad(){
     }
   } else {
     loadLocal();
+    if (location.protocol !== 'file:') showLocalBanner();
   }
 }
 (function init(){
