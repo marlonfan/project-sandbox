@@ -195,10 +195,24 @@
     box-shadow:0 0 0 3px rgba(217,119,87,.12);
   }
   .ptitle-wrap{display:flex;flex-direction:column;gap:1px;min-width:0}
-  .pnote{font-size:10.5px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .psub-note{opacity:0;transition:opacity .15s}
+  .pnote{font-size:10.5px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;border-radius:4px;padding:1px 4px;margin:0 -4px;transition:background .15s,color .15s}
+  .pnote:hover{background:rgba(217,119,87,.08);color:var(--accent)}
+  .pnote::before{content:'💬 ';font-size:9px}
+  .psub-note{position:relative;opacity:.45;transition:opacity .15s}
+  .psub-note.has-notes{opacity:1}
   .psub-note.on{opacity:1;color:var(--accent)}
-  .psub-item:hover .psub-note,.psub-item:hover .psub-del,.issue-item:hover .icon-btn{opacity:1}
+  .note-n{position:absolute;top:-5px;right:-6px;background:var(--accent);color:#fff;font-size:9px;font-weight:700;border-radius:99px;padding:0 4px;line-height:1.5;font-style:normal}
+  .psub-item:hover .psub-note{opacity:1}
+  .psub-del{opacity:0;transition:opacity .15s}
+  .psub-item:hover .psub-del,.issue-item:hover .icon-btn{opacity:1}
+  /* 触屏设备没有 hover：编辑/删除等按钮常显（半透明降噪音），触摸目标稍大 */
+  @media (hover: none){
+    .pnote-row .icon-btn{opacity:.55}
+    .psub-del{opacity:.55}
+    .issue-item .icon-btn{opacity:.55}
+    .psub-note{opacity:.85}
+    .icon-btn{width:30px;height:30px}
+  }
   .issue-item{flex-wrap:wrap}
   .issue-note-line{flex-basis:100%;padding-left:26px}
   .psub-notes{
@@ -1247,10 +1261,10 @@ function psubHTML(p){
               '<i class="pdot sev-' + i.severity + '"></i>' +
               '<span class="ptitle-wrap">' +
                 '<span class="ptitle">' + esc(i.title) + '</span>' +
-                (lastNote ? '<span class="pnote">' + esc(lastNote.text) + ' · ' + fmtHist(lastNote.ts) + '</span>' : '') +
+                (lastNote ? '<span class="pnote" data-action="note-issue" data-id="' + i.id + '" title="点击补充/查看进展">' + esc(lastNote.text) + ' · ' + fmtHist(lastNote.ts) + '</span>' : '') +
               '</span>' +
             '</span>' +
-            '<button class="icon-btn psub-note' + (openNotesIssueId === i.id ? ' on' : '') + '" data-action="note-issue" data-id="' + i.id + '" title="' + (openNotesIssueId === i.id ? '收起进展记录' : '进展记录') + '">' + ICONS.note + '</button>' +
+            '<button class="icon-btn psub-note' + (notes.length ? ' has-notes' : '') + (openNotesIssueId === i.id ? ' on' : '') + '" data-action="note-issue" data-id="' + i.id + '" title="' + (openNotesIssueId === i.id ? '收起进展记录' : '进展记录（' + notes.length + ' 条）') + '">' + ICONS.note + (notes.length ? '<i class="note-n">' + notes.length + '</i>' : '') + '</button>' +
             '<button class="icon-btn psub-del" data-action="delete-issue" data-id="' + i.id + '" title="删除事项">' + ICONS.trash + '</button>' +
           '</div>' +
           (openNotesIssueId === i.id ? notesPanelHTML(i) : '')
